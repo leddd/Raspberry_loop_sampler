@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
 import asyncio
-import sys
 import numpy as np
 import sounddevice as sd
 from pyo import *
@@ -10,18 +8,26 @@ s = Server().boot()
 s.start()
 
 # User-defined parameters
-bpm = 120  # Beats per minute
-beats_per_bar = 4  # Beats per bar
-total_bars = 4  # Number of bars to record
-
-recording_volume = 1.0  # Adjust recording volume as needed
+bpm = 100  # Beats per minute
+beats_per_bar = 3  # Beats per bar
+total_bars = 2  # Number of bars to record
 channels = 1  # Number of audio channels (1 for mono, 2 for stereo)
 samplerate = 44100  # Sampling rate for recording
 
-# Calculate beat interval in seconds and total recording frames
+# Calculate beat interval in seconds
 beat_interval = 60.0 / bpm
-record_duration = beat_interval * beats_per_bar * total_bars
-frames = int(record_duration * samplerate)
+
+# Calculate the buffer duration in one line
+buffer_duration = total_bars * beats_per_bar * beat_interval
+playback_start = buffer_duration - 0.25
+
+# Calculate total frames for the buffer
+buffer_size = int(buffer_duration * samplerate)
+buffer = np.zeros((buffer_size, channels), dtype='float32')
+write_ptr = 0
+read_ptr = 0
+recording_done = False
+playback_started = False
 
 # Click parameters
 click_volume = 0.1  # Adjust volume as needed
@@ -42,110 +48,110 @@ click2, click2_high = create_clicks('samples/click2.wav', click2_volume)
 def play_click(high_pitch=False):
     if high_pitch:
         click_high.out()
-        print("High pitch click played")  # Debugging line to confirm function call
     else:
         click.out()
-        print("Click played")  # Debugging line to confirm function call
 
 # Define a function to play the second click sound
 def play_click2(high_pitch=False):
     if high_pitch:
         click2_high.out()
-        print("High pitch click2 played")  # Debugging line to confirm function call
     else:
         click2.out()
-        print("Click2 played")  # Debugging line to confirm function call
 
-# Function to perform a countdown click for one bar
-def countdown_click():
-    for beat_num in range(beats_per_bar):
-        if beat_num == 0:
-            play_click(high_pitch=True)
-        else:
-            play_click()
-        time.sleep(beat_interval)
-        print(f"Countdown - Beat {beat_num + 1}")
+# Shared state variables
+current_bar = 0
+current_beat = 0
+click2_enabled = True  # Toggle state for click2
 
-# Asynchronous function to play click2 during recording
-async def tempo_click():
-    beats_played = 0
-    total_beats = total_bars * beats_per_bar
-    while beats_played < total_beats:
-        if beats_played % beats_per_bar == 0:
-            play_click2(high_pitch=True)
-        else:
-            play_click2()
+# Function to toggle the click2 track
+def toggle_click2():
+    global click2_enabled
+    click2_enabled = not click2_enabled
+    print(f"Click2 enabled: {click2_enabled}")
+
+# Countdown before the master clock starts
+async def countdown():
+    print("Starting countdown...")
+    for beat in range(1, beats_per_bar + 1):
+        print(f"Countdown - Beat {beat}")
+        play_click(high_pitch=(beat == 1))
         await asyncio.sleep(beat_interval)
-        beats_played += 1
 
-# Record and playback audio buffer asynchronously
-async def record_buffer(buffer, volume=1.0, **kwargs):
-    loop = asyncio.get_event_loop()
-    event = asyncio.Event()
-    idx = 0
+# Master clock to keep track of bars and beats
+async def master_clock():
+    global current_bar, current_beat, click2_enabled
+    while True:
+        for bar in range(1, total_bars + 1):
+            current_bar = bar
+            for beat in range(1, beats_per_bar + 1):
+                current_beat = beat
+                print(f"Master Clock - Bar {bar}, Beat {beat}")
+                if click2_enabled:
+                    play_click2(high_pitch=(beat == 1))
+                await asyncio.sleep(beat_interval)
 
-    def callback(indata, frame_count, time_info, status):
-        nonlocal idx
+# Recording and playback logic
+async def record_and_playback():
+    global write_ptr, read_ptr, recording_done, playback_started
+
+    def callback(indata, outdata, frames, time, status):
+        global write_ptr, read_ptr, recording_done, playback_started
+
         if status:
             print(status)
-        remainder = len(buffer) - idx
-        if remainder == 0:
-            loop.call_soon_threadsafe(event.set)
-            raise sd.CallbackStop
-        indata = indata[:remainder] * volume
-        buffer[idx:idx + len(indata)] = indata
-        idx += len(indata)
 
-    stream = sd.InputStream(callback=callback, dtype=buffer.dtype,
-                            channels=buffer.shape[1], **kwargs)
-    with stream:
-        await event.wait()
+        # Recording
+        if not recording_done:
+            if write_ptr + frames <= buffer_size:
+                buffer[write_ptr:write_ptr + frames] = indata
+                write_ptr += frames
+            else:
+                remaining_space = buffer_size - write_ptr
+                buffer[write_ptr:] = indata[:remaining_space]
+                buffer[:frames - remaining_space] = indata[remaining_space:]
+                write_ptr = frames - remaining_space
+                recording_done = True
 
-async def play_buffer(buffer, **kwargs):
-    loop = asyncio.get_event_loop()
-    event = asyncio.Event()
-    idx = 0
+        # Start playback
+        if write_ptr >= int(playback_start * samplerate) and not playback_started:
+            playback_started = True
+            read_ptr = 0  # Reset read pointer for playback
+            print(f"Starting playback at second {playback_start}")
 
-    def callback(outdata, frame_count, time_info, status):
-        nonlocal idx
-        if status:
-            print(status)
-        remainder = len(buffer) - idx
-        if remainder == 0:
-            loop.call_soon_threadsafe(event.set)
-            raise sd.CallbackStop
-        valid_frames = frame_count if remainder >= frame_count else remainder
-        outdata[:valid_frames] = buffer[idx:idx + valid_frames]
-        outdata[valid_frames:] = 0
-        idx += valid_frames
+        # Playback
+        if playback_started:
+            if read_ptr + frames <= buffer_size:
+                outdata[:] = buffer[read_ptr:read_ptr + frames]
+                read_ptr += frames
+            else:
+                remaining_space = buffer_size - read_ptr
+                outdata[:remaining_space] = buffer[read_ptr:]
+                outdata[remaining_space:] = buffer[:frames - remaining_space]
+                read_ptr = frames - remaining_space
 
-    stream = sd.OutputStream(callback=callback, dtype=buffer.dtype,
-                             channels=buffer.shape[1], **kwargs)
-    with stream:
-        await event.wait()
+    # Create the audio stream with the callback function
+    with sd.Stream(callback=callback, channels=channels, samplerate=samplerate, dtype='float32'):
+        print("Recording and playback in real-time using a circular buffer.")
+        print(f"Recording for {buffer_duration} seconds...")
+        await asyncio.sleep(buffer_duration + 1)  # Sleep for the duration of the buffer + 1 second for safety
 
+        print("Recording finished. Playing back the buffer in a loop.")
+        while True:
+            await asyncio.sleep(1)  # Keep the stream running
+
+# Main function to run the countdown, clock, and other tasks
 async def main():
-    buffer = np.empty((frames, channels), dtype='float32')
+    # Run countdown first
+    await countdown()
 
-    # Perform a countdown before recording
-    print('Starting countdown...')
-    countdown_click()
+    # Start the master clock
+    clock_task = asyncio.create_task(master_clock())
 
-    print('Recording buffer ...')
-    click2_task = asyncio.create_task(tempo_click())
-    await record_buffer(buffer, samplerate=samplerate, volume=recording_volume)
-    await click2_task
-    print('Recording finished')
+    # Start the record and playback task
+    record_task = asyncio.create_task(record_and_playback())
 
-    print('Playing buffer ...')
-    await play_buffer(buffer, samplerate=samplerate)
-    print('Playback finished')
+    # Wait for tasks to complete
+    await asyncio.gather(clock_task, record_task)
 
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        sys.exit('\nInterrupted by user')
-
-# Keep the pyo server running
-s.gui(locals())
+# Run the main event loop
+asyncio.run(main())
