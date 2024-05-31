@@ -3,13 +3,14 @@ import numpy as np
 import sounddevice as sd
 from pyo import *
 import tkinter as tk
+import time
 
 # Initialize the pyo server
 s = Server().boot()
 s.start()
 
 # User-defined parameters
-bpm = 100  # Beats per minute
+bpm = 128  # Beats per minute
 beats_per_bar = 4  # Beats per bar
 total_bars = 2  # Number of bars to record
 channels = 1  # Number of audio channels (1 for mono, 2 for stereo)
@@ -18,24 +19,22 @@ samplerate = 44100  # Sampling rate for recording
 # Calculate beat interval in seconds
 beat_interval = 60.0 / bpm
 
-# Calculate the buffer duration in one line
+# Calculate the buffer duration
 buffer_duration = total_bars * beats_per_bar * beat_interval
 playback_start = buffer_duration - 0.25
 
 # Calculate total frames for the buffer
 buffer_size = int(buffer_duration * samplerate)
-buffer = np.zeros((buffer_size, channels), dtype='float32')
 
-# Initialize overdub buffers for 5 additional tracks
-num_tracks = 6
-overdub_buffers = [np.zeros((buffer_size, channels), dtype='float32') for _ in range(num_tracks - 1)]
-write_ptr = 0
+# Buffers for each track
+buffers = [np.zeros((buffer_size, channels), dtype='float32') for _ in range(6)]
+write_ptrs = [0] * 6
 read_ptr = 0
-recording_done = False
+recording_done = [False] * 6
 playback_started = False
-overdub_requests = [False] * (num_tracks - 1)
-overdub_recordings = [False] * (num_tracks - 1)
-overdub_write_ptrs = [0] * (num_tracks - 1)
+overdub_requested = [False] * 6
+overdub_recording = [False] * 6
+overdub_write_ptrs = [0] * 6
 
 # Click parameters
 click_volume = 0.1  # Adjust volume as needed
@@ -87,8 +86,9 @@ async def countdown():
 
 # Master clock to keep track of bars and beats
 async def master_clock():
-    global current_bar, current_beat, click2_enabled, overdub_requests, overdub_recordings, overdub_write_ptrs
+    global current_bar, current_beat, click2_enabled, overdub_requested, overdub_recording, overdub_write_ptrs
     while True:
+        start_time = time.perf_counter()
         for bar in range(1, total_bars + 1):
             current_bar = bar
             for beat in range(1, beats_per_bar + 1):
@@ -96,72 +96,66 @@ async def master_clock():
                 print(f"Master Clock - Bar {bar}, Beat {beat}")
                 if click2_enabled:
                     play_click2(high_pitch=(beat == 1))
-                for i in range(num_tracks - 1):
-                    if overdub_requests[i] and bar == 1 and beat == 1:
-                        overdub_requests[i] = False
-                        overdub_recordings[i] = True
-                        overdub_write_ptrs[i] = 0
-                        print(f"Starting overdub recording for track {i + 2}")
-                await asyncio.sleep(beat_interval)
+                for track_id in range(1, 6):  # Check overdub for each track except master
+                    if overdub_requested[track_id] and bar == 1 and beat == 1:
+                        overdub_requested[track_id] = False
+                        overdub_recording[track_id] = True
+                        overdub_write_ptrs[track_id] = 0
+                        print(f"Starting overdub recording for track {track_id + 1}")
+                next_beat_time = start_time + beat * beat_interval
+                await asyncio.sleep(max(0, next_beat_time - time.perf_counter()))
 
 # Recording and playback logic
 async def record_and_playback():
-    global write_ptr, read_ptr, recording_done, playback_started, overdub_requests, overdub_recordings, overdub_write_ptrs
+    global write_ptrs, read_ptr, recording_done, playback_started, overdub_requested, overdub_recording, overdub_write_ptrs
 
     def callback(indata, outdata, frames, time, status):
-        global write_ptr, read_ptr, recording_done, playback_started, overdub_recordings, overdub_write_ptrs
+        global write_ptrs, read_ptr, recording_done, playback_started, overdub_recording, overdub_write_ptrs
 
         if status:
             print(status)
 
-        # Recording
-        if not recording_done:
-            if write_ptr + frames <= buffer_size:
-                buffer[write_ptr:write_ptr + frames] = indata
-                write_ptr += frames
-            else:
-                remaining_space = buffer_size - write_ptr
-                buffer[write_ptr:] = indata[:remaining_space]
-                buffer[:frames - remaining_space] = indata[remaining_space:]
-                write_ptr = frames - remaining_space
-                recording_done = True
-
-        # Overdub recording
-        for i in range(num_tracks - 1):
-            if overdub_recordings[i]:
-                if overdub_write_ptrs[i] + frames <= buffer_size:
-                    overdub_buffers[i][overdub_write_ptrs[i]:overdub_write_ptrs[i] + frames] = indata
-                    overdub_write_ptrs[i] += frames
+        # Recording for each track
+        for track_id in range(6):
+            if not recording_done[track_id]:
+                if write_ptrs[track_id] + frames <= buffer_size:
+                    buffers[track_id][write_ptrs[track_id]:write_ptrs[track_id] + frames] = indata
+                    write_ptrs[track_id] += frames
                 else:
-                    remaining_space = buffer_size - overdub_write_ptrs[i]
-                    overdub_buffers[i][overdub_write_ptrs[i]:] = indata[:remaining_space]
-                    overdub_buffers[i][:frames - remaining_space] = indata[remaining_space:]
-                    overdub_write_ptrs[i] = frames - remaining_space
-                    overdub_recordings[i] = False
-                    print(f"Overdub recording for track {i + 2} finished")
+                    remaining_space = buffer_size - write_ptrs[track_id]
+                    buffers[track_id][write_ptrs[track_id]:] = indata[:remaining_space]
+                    buffers[track_id][:frames - remaining_space] = indata[remaining_space:]
+                    write_ptrs[track_id] = frames - remaining_space
+                    recording_done[track_id] = True
+                if track_id == 0:
+                    recording_done[track_id] = True
+
+        # Overdub recording for each track
+        for track_id in range(1, 6):
+            if overdub_recording[track_id]:
+                if overdub_write_ptrs[track_id] + frames <= buffer_size:
+                    buffers[track_id][overdub_write_ptrs[track_id]:overdub_write_ptrs[track_id] + frames] = indata
+                    overdub_write_ptrs[track_id] += frames
+                else:
+                    remaining_space = buffer_size - overdub_write_ptrs[track_id]
+                    buffers[track_id][overdub_write_ptrs[track_id]:] = indata[:remaining_space]
+                    buffers[track_id][:frames - remaining_space] = indata[remaining_space:]
+                    overdub_write_ptrs[track_id] = frames - remaining_space
+                    overdub_recording[track_id] = False
+                    print(f"Overdub recording finished for track {track_id + 1}")
 
         # Start playback
-        if write_ptr >= int(playback_start * samplerate) and not playback_started:
+        if write_ptrs[0] >= int(playback_start * samplerate) and not playback_started:
             playback_started = True
             read_ptr = 0  # Reset read pointer for playback
             print(f"Starting playback at second {playback_start}")
 
         # Playback
         if playback_started:
-            if read_ptr + frames <= buffer_size:
-                outdata[:] = buffer[read_ptr:read_ptr + frames]
-                for i in range(num_tracks - 1):
-                    outdata[:] += overdub_buffers[i][read_ptr:read_ptr + frames]
-                read_ptr += frames
-            else:
-                remaining_space = buffer_size - read_ptr
-                outdata[:remaining_space] = buffer[read_ptr:]
-                for i in range(num_tracks - 1):
-                    outdata[:remaining_space] += overdub_buffers[i][read_ptr:]
-                outdata[remaining_space:] = buffer[:frames - remaining_space]
-                for i in range(num_tracks - 1):
-                    outdata[remaining_space:] += overdub_buffers[i][:frames - remaining_space]
-                read_ptr = frames - remaining_space
+            outdata[:] = sum(buffers[track_id][read_ptr:read_ptr + frames] for track_id in range(6))
+            read_ptr += frames
+            if read_ptr >= buffer_size:
+                read_ptr = 0
 
     # Create the audio stream with the callback function
     with sd.Stream(callback=callback, channels=channels, samplerate=samplerate, dtype='float32'):
@@ -195,6 +189,7 @@ class LooperApp:
         self.root.geometry("500x350")
         self.root.configure(bg='darkgray')
 
+        self.track_buttons = []
         for i in range(2):  # Two rows
             root.grid_rowconfigure(i, weight=1)
             for j in range(3):  # Three columns
@@ -202,20 +197,15 @@ class LooperApp:
                 track_id = i * 3 + j
                 button = tk.Button(root, text=f"Track {track_id + 1}", bg='gray', activebackground='lightgray', command=lambda track_id=track_id: self.on_button_press(track_id))
                 button.grid(row=i, column=j, padx=10, pady=10, sticky="nsew")
-                if track_id == 0:
-                    self.track1_button = button
-                else:
-                    self.overdub_buttons.append(button)
+                self.track_buttons.append(button)
 
     def on_button_press(self, track_id):
         if track_id == 0:
             asyncio.run_coroutine_threadsafe(main(), loop)
         else:
-            global overdub_requests
-            overdub_requests[track_id - 1] = True
+            global overdub_requested
+            overdub_requested[track_id] = True
             print(f"Overdub requested for track {track_id + 1}")
-
-    overdub_buttons = []
 
 # Start the GUI
 def start_gui():
