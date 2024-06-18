@@ -1,4 +1,6 @@
 from pyo import *
+import keyboard
+import threading
 
 # Initialize server
 s = Server(duplex=1).boot()
@@ -72,6 +74,10 @@ class Track:
         self.channels = channels
         self.feedback = feedback
         self.master_trig = None
+        self.track_trig = None
+        self.playback = None
+        self.recorder = None
+        self.initialized = False  # Flag to ensure initialization only happens once
 
     def start_recording(self):
         self.recorder.play()
@@ -85,39 +91,95 @@ class Track:
         self.playback.stop()
         print("Stopped Playback.")
         
-    def rec_master_track(self): 
-        if self.metronome.countdown_counter.get() == self.metronome.beats_per_bar + 1:
-            self.table = NewTable(length=self.metronome.duration, chnls=self.channels, feedback=self.feedback)
-            self.input = Input([0, 1])
-            self.recorder = TableRec(self.input, table=self.table, fadetime=0.01)
-            self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=0.5, xfade=0)
-            self.master_trig = CallAfter(self.start_recording, latency)
-
-        if self.metronome.countdown_counter.get() == self.metronome.beats_per_bar * (1 + self.metronome.total_bars) + 1:
-            self.start_playback()
-            self.metronome.play_clicks = False
-            
     def print_countdown(self):
         if self.metronome.countdown_counter.get() <= self.metronome.beats_per_bar:
             print("Countdown counter:", self.metronome.countdown_counter.get())
     
     def print_beat(self):
         print("Current beat:", self.metronome.current_beat.get())
-     
+        
+    def rec_master_track(self): 
+        if self.metronome.countdown_counter.get() == self.metronome.beats_per_bar + 1:
+            self.table = NewTable(length=self.metronome.duration, chnls=self.channels, feedback=self.feedback)
+            self.input = Input([0, 1])
+            self.recorder = TableRec(self.input, table=self.table, fadetime=0.01)
+            self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=0.5, xfade=0).out()
+            self.master_trig = CallAfter(self.start_recording, latency)
+
+        if self.metronome.countdown_counter.get() == self.metronome.beats_per_bar * (1 + self.metronome.total_bars) + 1:
+            self.metronome.play_clicks = False
+
     def init_master_track(self):
         self.metronome.init()
         self.trig_rec_master = TrigFunc(self.metronome.countdown_metro, self.rec_master_track)
+        
         self.trig_countdown = TrigFunc(self.metronome.countdown_metro, self.metronome.countdown_click)
-        self.trig_click = TrigFunc(self.metronome.metro, self.metronome.regular_click)
         self.trig_print_countdown = TrigFunc(self.metronome.countdown_metro, self.print_countdown)
+        
+        self.trig_click = TrigFunc(self.metronome.metro, self.metronome.regular_click)
         self.trig_print_beat = TrigFunc(self.metronome.metro, self.print_beat)
+        
+    def rec_track(self):
+        if not self.initialized:
+            self.table = NewTable(length=self.metronome.duration, chnls=self.channels, feedback=self.feedback)
+            self.input = Input([0, 1])
+            self.recorder = TableRec(self.input, table=self.table, fadetime=0.01).out()
+            self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=0.5, xfade=0).out()
+            self.track_trig = CallAfter(self.start_recording, latency)
+            self.initialized = True
+        
+    def init_track(self, master):
+        self.trig_rec = TrigFunc(master.playback['trig'], self.rec_track)
 
+class LoopStation:
+    def __init__(self, server, bpm, beats_per_bar, total_bars, click_volume):
+        self.server = server
+        self.metronome = Metronome(bpm, beats_per_bar, total_bars, click_volume)
+        self.tracks = []
+        
+        self.master_track = Track(server, self.metronome)
+        self.tracks.append(self.master_track)
+        
+    def init_master_track(self):
+        self.master_track.init_master_track()
+        print("Master track initialized")
+        
+    def init_track(self, track_num):
+        track = Track(self.server, self.metronome)
+        track.init_track(self.master_track)
+        self.tracks.append(track)
+        print(f"Track {track_num} initialized")
+        
+# Initialize loop station
+loop_station = LoopStation(s, bpm, beats_per_bar, total_bars, click_volume)
 
-# Initialize metronome and track
-metronome = Metronome(bpm, beats_per_bar, total_bars, click_volume)
-track = Track(s, metronome)
+# Define function to initialize master track
+def init_master_track():
+    loop_station.init_master_track()
 
-track.init_master_track()
+# Define function to initialize additional tracks
+def init_track_2():
+    loop_station.init_track(2)
 
-# Continue running the server
-s.gui(locals())
+def init_track_3():
+    loop_station.init_track(3)
+
+def init_track_4():
+    loop_station.init_track(4)
+
+def init_track_5():
+    loop_station.init_track(5)
+
+def init_track_6():
+    loop_station.init_track(6)
+
+# Bind hotkeys
+keyboard.add_hotkey('m', init_master_track)
+keyboard.add_hotkey('2', init_track_2)
+keyboard.add_hotkey('3', init_track_3)
+keyboard.add_hotkey('4', init_track_4)
+keyboard.add_hotkey('5', init_track_5)
+keyboard.add_hotkey('6', init_track_6)
+
+# Keep the script running to listen for hotkey inputs
+keyboard.wait('esc')  # Press 'esc' to exit the script
