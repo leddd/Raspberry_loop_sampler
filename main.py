@@ -7,9 +7,9 @@ s = Server(duplex=1).boot()
 s.start()
 
 # User-defined parameters
-bpm = 128
+bpm = 100
 beats_per_bar = 4
-total_bars = 2
+total_bars = 1
 click_volume = 0.15  # Control the volume of the clicks
 latency = 0.2  # Latency in seconds
 
@@ -66,7 +66,6 @@ class Metronome:
                 self.click2_high.out()
             else:
                 self.click2.out()
-
 class Track:
     def __init__(self, server, metronome, channels=2, feedback=0.5):
         self.server = server
@@ -78,6 +77,7 @@ class Track:
         self.playback = None
         self.recorder = None
         self.initialized = False  # Flag to ensure initialization only happens once
+        self.hp_freq = 650  # Highpass filter frequency
 
     def start_recording(self):
         self.recorder.play()
@@ -102,8 +102,9 @@ class Track:
         if self.metronome.countdown_counter.get() == self.metronome.beats_per_bar + 1:
             self.table = NewTable(length=self.metronome.duration, chnls=self.channels, feedback=self.feedback)
             self.input = Input([0, 1])
-            self.recorder = TableRec(self.input, table=self.table, fadetime=0.01)
-            self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=0.5, xfade=0).out()
+            self.recorder = TableRec(self.input, table=self.table, fadetime=0.005)
+            self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=0.5, xfade=0)
+            self.highpass = ButHP(self.playback, freq=self.hp_freq).out()  # Apply highpass filter
             self.master_trig = CallAfter(self.start_recording, latency)
 
         if self.metronome.countdown_counter.get() == self.metronome.beats_per_bar * (1 + self.metronome.total_bars) + 1:
@@ -124,7 +125,8 @@ class Track:
             self.table = NewTable(length=self.metronome.duration, chnls=self.channels, feedback=self.feedback)
             self.input = Input([0, 1])
             self.recorder = TableRec(self.input, table=self.table, fadetime=0.01).out()
-            self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=0.5, xfade=0).out()
+            self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=0.5, xfade=0)
+            self.highpass = ButHP(self.playback, freq=self.hp_freq).out()  # Apply highpass filter
             self.track_trig = CallAfter(self.start_recording, latency)
             self.initialized = True
         
