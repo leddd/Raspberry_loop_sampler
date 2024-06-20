@@ -2,7 +2,7 @@ from pyo import *
 
 
 # Initialize server
-s = Server().boot()
+s = Server(sr=44100).boot()
 s.start()
 
 # User-defined parameters

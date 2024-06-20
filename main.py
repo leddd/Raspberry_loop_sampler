@@ -3,7 +3,7 @@ import keyboard
 import threading
 
 # Initialize server
-s = Server(duplex=1).boot()
+s = Server(sr=48000, buffersize=256,audio='pa').boot()
 s.start()
 
 # User-defined parameters
@@ -66,6 +66,7 @@ class Metronome:
                 self.click2_high.out()
             else:
                 self.click2.out()
+                
 class Track:
     def __init__(self, server, metronome, channels=2, feedback=0.5):
         self.server = server
