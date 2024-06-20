@@ -2,7 +2,7 @@ from pyo import *
 
 
 # Initialize server
-s = Server().boot()
+s = Server(duplex=1).boot()
 s.start()
 
 # User-defined parameters
@@ -15,11 +15,20 @@ volume = 0.2  # Control the volume of the clicks
 interval = 60 / bpm
 duration = interval * beats_per_bar * total_bars  # Loop duration in seconds
 
-# Load samples with volume control
-click = SfPlayer("samples/click.wav", speed=1, loop=False, mul=volume)
-click_high = SfPlayer("samples/click.wav", speed=1.5, loop=False, mul=volume)  # High pitch for first countdown beat
-click2 = SfPlayer("samples/click2.wav", speed=1, loop=False, mul=volume)
-click2_high = SfPlayer("samples/click2.wav", speed=1.5, loop=False, mul=volume)  # High pitch for first beat of regular bars
+
+
+fcount = Adsr(attack=0.01, decay=0.1, sustain=0, release=0, mul=0.2)
+fcount2 = Adsr(attack=0.01, decay=0.1, sustain=0, release=0, mul=0.2)
+fclick = Adsr(attack=0.01, decay=0.02, sustain=0, release=0, mul=0.1)
+fclick2 = Adsr(attack=0.01, decay=0.02, sustain=0, release=0, mul=0.1)
+
+sine2 = Sine(freq=[800], mul=fcount).out()
+sine = Sine(freq=[600], mul=fcount2).out()
+
+click = Noise(fclick).out()
+click2 = PinkNoise(fclick2).out()
+clickhp = ButHP(click, freq=5000).out()  # Apply highpass filter
+
 
 # Metro setup
 metronome = Metro(time=interval, poly=7).play()
@@ -33,16 +42,15 @@ play_clicks = True  # Flag to control click playback
 def countdown_click():
     if play_clicks:
         if current_beat % beats_per_bar == 0:
-            click_high.out()
+            fcount.play()
         else:
-            click.out()
+            fcount2.play()
 
 def regular_click():
-    if play_clicks:
-        if current_beat % beats_per_bar == 0:
-            click2_high.out()
-        else:
-            click2.out()
+    if current_beat % beats_per_bar == 0:
+        fclick.play()
+    else:
+        fclick2.play()
 
 def update_counters():
     global current_beat, current_bar, countdown_complete

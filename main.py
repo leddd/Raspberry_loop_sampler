@@ -3,22 +3,24 @@ import keyboard
 import threading
 
 # Initialize server
-s = Server(duplex=1).boot()
+s = Server(sr=48000, buffersize=1024, audio='pa', ichnls=1, nchnls=1, duplex=1)
+
+# s.setInputDevice(1) # USB Audio Device
+# s.setOutputDevice(0) # bcm2835 Headphones
+s.boot()
 s.start()
 
 # User-defined parameters
 bpm = 100
 beats_per_bar = 4
 total_bars = 1
-click_volume = 0.15  # Control the volume of the clicks
 latency = 0.2  # Latency in seconds
 
 class Metronome:
-    def __init__(self, bpm, beats_per_bar, total_bars, click_volume):
+    def __init__(self, bpm, beats_per_bar, total_bars):
         self.bpm = bpm
         self.beats_per_bar = beats_per_bar
         self.total_bars = total_bars
-        self.click_volume = click_volume
 
         self.interval = 60 / bpm
         self.duration = self.interval * beats_per_bar * total_bars  # Loop duration in seconds
@@ -27,12 +29,17 @@ class Metronome:
         self.countdown_counter = Counter(self.countdown_metro, min=1)
         self.metro = Metro(time=self.interval)
         self.current_beat = Counter(self.metro, min=1, max=(total_bars * beats_per_bar) + 1)
-
-        # Load samples with volume control
-        self.click = SfPlayer("samples/click.wav", speed=1, loop=False, mul=self.click_volume)
-        self.click_high = SfPlayer("samples/click.wav", speed=1.5, loop=False, mul=self.click_volume)  # High pitch for first countdown beat
-        self.click2 = SfPlayer("samples/click2.wav", speed=1, loop=False, mul=self.click_volume)
-        self.click2_high = SfPlayer("samples/click2.wav", speed=1.5, loop=False, mul=self.click_volume)  # High pitch for first beat of regular bars
+        
+        # click setup
+        self.fcount = Adsr(attack=0.01, decay=0.1, sustain=0, release=0, mul=0.2)
+        self.fcount2 = Adsr(attack=0.01, decay=0.1, sustain=0, release=0, mul=0.2)
+        self.fclick = Adsr(attack=0.01, decay=0.02, sustain=0, release=0, mul=0.2)
+        self.fclick2 = Adsr(attack=0.01, decay=0.02, sustain=0, release=0, mul=0.2)
+        self.sine2 = Sine(freq=[800], mul=self.fcount).out()
+        self.sine = Sine(freq=[600], mul=self.fcount2).out()
+        self.click = Noise(self.fclick).out()
+        self.click2 = PinkNoise(self.fclick2).out()
+        self.clickhp = ButHP(self.click, freq=5000).out()  # Apply highpass filter
 
         self.play_clicks = True
 
@@ -56,16 +63,16 @@ class Metronome:
     def countdown_click(self):
         if self.countdown_counter.get() <= self.beats_per_bar:
             if self.countdown_counter.get() == 1.0:
-                self.click_high.out()
+                self.fcount.play()
             else:
-                self.click.out()
+                self.fcount2.play()
 
     def regular_click(self):
         if self.play_clicks:
             if self.current_beat.get() == 1.0 or (self.current_beat.get() - 1) % self.beats_per_bar == 0:
-                self.click2_high.out()
+                self.fclick.play()
             else:
-                self.click2.out()
+                self.fclick2.play()
 class Track:
     def __init__(self, server, metronome, channels=2, feedback=0.5):
         self.server = server
@@ -132,11 +139,10 @@ class Track:
         
     def init_track(self, master):
         self.trig_rec = TrigFunc(master.playback['trig'], self.rec_track)
-
 class LoopStation:
-    def __init__(self, server, bpm, beats_per_bar, total_bars, click_volume):
+    def __init__(self, server, bpm, beats_per_bar, total_bars):
         self.server = server
-        self.metronome = Metronome(bpm, beats_per_bar, total_bars, click_volume)
+        self.metronome = Metronome(bpm, beats_per_bar, total_bars)
         self.tracks = []
         
         self.master_track = Track(server, self.metronome)
@@ -153,7 +159,7 @@ class LoopStation:
         print(f"Track {track_num} initialized")
         
 # Initialize loop station
-loop_station = LoopStation(s, bpm, beats_per_bar, total_bars, click_volume)
+loop_station = LoopStation(s, bpm, beats_per_bar, total_bars)
 
 # Define function to initialize master track
 def init_master_track():
