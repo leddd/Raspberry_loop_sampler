@@ -31,5 +31,8 @@ track = Track(s, duration=2)  # Set loop duration to 2 seconds
 track.start_recording()
 play_trig = TrigFunc(track.recorder['trig'], track.start_playback)
 
-# GUI for real-time control and visualization
-s.gui(locals())
+# Run for 5 seconds
+s.sleep(15)
+
+# Stop the server
+s.stop()
