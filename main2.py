@@ -113,7 +113,7 @@ class Track:
             self.table = NewTable(length=self.metronome.duration, chnls=self.channels, feedback=self.feedback)
             self.input = Input([0, 1])
             self.recorder = TableRec(self.input, table=self.table, fadetime=0.005)
-            self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=1.5, xfade=0)
+            self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=10, xfade=0)
             self.highpass = ButHP(self.playback, freq=self.hp_freq).out()  # Apply highpass filter
             self.master_trig = CallAfter(self.start_recording, latency)
 
@@ -135,7 +135,7 @@ class Track:
             self.table = NewTable(length=self.metronome.duration, chnls=self.channels, feedback=self.feedback)
             self.input = Input([0, 1])
             self.recorder = TableRec(self.input, table=self.table, fadetime=0.01).out()
-            self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=1.5, xfade=0)
+            self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=10, xfade=0)
             self.highpass = ButHP(self.playback, freq=self.hp_freq).out()  # Apply highpass filter
             self.track_trig = CallAfter(self.start_recording, latency)
             self.initialized = True
