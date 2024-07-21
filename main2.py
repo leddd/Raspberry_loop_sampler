@@ -184,37 +184,7 @@ class LoopStation:
 # Initialize loop station
 loop_station = LoopStation(s, bpm, beats_per_bar, total_bars)
 
-# GPIO handling functions
-def handle_rotary_encoder():
-    global counter, direction, prev_CLK_state
 
-    CLK_state = GPIO.input(CLK_PIN)
-    if CLK_state != prev_CLK_state and CLK_state == GPIO.HIGH:
-        if GPIO.input(DT_PIN) == GPIO.HIGH:
-            counter -= 1
-            direction = DIRECTION_CCW
-        else:
-            counter += 1
-            direction = DIRECTION_CW
-
-        print("Rotary Encoder:: direction:", "CLOCKWISE" if direction == DIRECTION_CW else "ANTICLOCKWISE",
-              "- count:", counter)
-
-    prev_CLK_state = CLK_state
-
-def handle_encoder_button():
-    global button_pressed, prev_button_state
-
-    button_state = GPIO.input(SW_PIN)
-    if button_state != prev_button_state:
-        time.sleep(0.01)
-        if button_state == GPIO.LOW:
-            print("Rotary Encoder Button:: The button is pressed")
-            button_pressed = True
-            if button_pressed:
-                loop_station.init_master_track()
-                button_pressed = False
-        prev_button_state = button_state
 
 def matrix_button_pressed(row_pin):
     for col in col_pins:
