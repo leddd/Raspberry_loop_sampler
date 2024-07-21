@@ -25,5 +25,3 @@ except KeyboardInterrupt:
     print("Stopping Pyo server...")
     s.stop()
     s.shutdown()
-# Run the server
-s.gui(locals())  # Note: This might not work on a headless system
