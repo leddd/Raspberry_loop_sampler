@@ -2,7 +2,11 @@ from pyo import *
 
 
 # Initialize server
-s = Server(duplex=1).boot()
+s = Server(sr=48000, buffersize=1024, audio='portaudio', nchnls=1, ichnls=1, duplex=1)
+s.setInputDevice(1)
+s.setOutputDevice(0)
+
+s.boot()
 s.start()
 
 # User-defined parameters
