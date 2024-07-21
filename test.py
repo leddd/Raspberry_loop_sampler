@@ -19,7 +19,7 @@ f.play()
 # Keep the script running to allow audio processing
 try:
     while True:
-        time.sleep(1)  # Sleep to keep the script alive
+        time.sleep(100)  # Sleep to keep the script alive
 except KeyboardInterrupt:
     # Graceful shutdown on user interrupt
     print("Stopping Pyo server...")
