@@ -1,14 +1,15 @@
 from pyo import *
 
-# Initialize Pyo server with JACK audio
-s = Server(audio='jack').boot()
+# Boot the server
+s = Server().boot()
+
+# Start the server
 s.start()
 
-# Create an audio effect with a sine wave
+# Create an audio object (e.g., a sine wave generator)
 f = Fader(fadeout=0.2, dur=0.1, mul=.2)
 sine = Sine(freq=[500], mul=f).out()
 f.play()
-
 # Keep the script running to allow audio processing
 try:
     while True:
