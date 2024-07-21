@@ -3,11 +3,11 @@ import keyboard
 
 
 # Initialize server
-s = Server(duplex=1)
-# s = Server(sr=48000, buffersize=1024, audio='pa', ichnls=1, nchnls=1, duplex=1)
+s = Server(sr=48000, buffersize=1024, audio='portaudio', nchnls=1, ichnls=1, duplex=1)
+s.setInputDevice(1)
+s.setOutputDevice(0)
 
-# s.setInputDevice(1) # USB Audio Device
-# s.setOutputDevice(0) # bcm2835 Headphones
+
 s.boot()
 s.start()
 
@@ -192,3 +192,13 @@ keyboard.add_hotkey('6', init_track_6)
 
 # Keep the script running to listen for hotkey inputs
 keyboard.wait('esc')  # Press 'esc' to exit the script
+
+
+try:
+    while True:
+        time.sleep(100)  # Sleep to keep the script alive
+except KeyboardInterrupt:
+    # Graceful shutdown on user interrupt
+    print("Stopping Pyo server...")
+    s.stop()
+    s.shutdown()
