@@ -8,9 +8,9 @@ row_pins = [12, 1]
 col_pins = [13, 6, 5]
 
 # Define the GPIO pins for the rotary encoder
-CLK_PIN = 17  # GPIO7 connected to the rotary encoder's CLK pin
+CLK_PIN = 22  # GPIO7 connected to the rotary encoder's CLK pin
 DT_PIN = 27   # GPIO8 connected to the rotary encoder's DT pin
-SW_PIN = 22   # GPIO25 connected to the rotary encoder's SW pin
+SW_PIN = 17   # GPIO25 connected to the rotary encoder's SW pin
 
 DIRECTION_CW = 0
 DIRECTION_CCW = 1
