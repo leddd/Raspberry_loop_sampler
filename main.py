@@ -194,11 +194,3 @@ keyboard.add_hotkey('6', init_track_6)
 keyboard.wait('esc')  # Press 'esc' to exit the script
 
 
-try:
-    while True:
-        time.sleep(100)  # Sleep to keep the script alive
-except KeyboardInterrupt:
-    # Graceful shutdown on user interrupt
-    print("Stopping Pyo server...")
-    s.stop()
-    s.shutdown()
