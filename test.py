@@ -1,9 +1,15 @@
 from pyo import *
 
+
+
 # Boot the server
-s = Server().boot()
+s = Server()
+s.setInputDevice(1)
+s.setOutputDevice(0)
 
 # Start the server
+s.start()
+s.boot()
 s.start()
 
 # Create an audio object (e.g., a sine wave generator)
