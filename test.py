@@ -13,7 +13,7 @@ s.boot()
 s.start()
 
 # Create an audio object (e.g., a sine wave generator)
-f = Fader(fadeout=0.2, dur=0.1, mul=.2)
+f = Fader(fadeout=0.2, dur=5, mul=.2)
 sine = Sine(freq=[500], mul=f).out()
 f.play()
 # Keep the script running to allow audio processing
