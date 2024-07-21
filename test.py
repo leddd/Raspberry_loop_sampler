@@ -3,7 +3,7 @@ from pyo import *
 
 
 # Boot the server
-s = Server()
+s = Server(audio='portaudio', duplex=1)
 s.setInputDevice(1)
 s.setOutputDevice(0)
 
