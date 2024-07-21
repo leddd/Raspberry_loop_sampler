@@ -33,8 +33,11 @@ track = Track(s, duration=2)  # Set loop duration to 2 seconds
 track.start_recording()
 play_trig = TrigFunc(track.recorder['trig'], track.start_playback)
 
-# Run for 5 seconds
-s.sleep(15)
-
-# Stop the server
-s.stop()
+try:
+    while True:
+        time.sleep(100)  # Sleep to keep the script alive
+except KeyboardInterrupt:
+    # Graceful shutdown on user interrupt
+    print("Stopping Pyo server...")
+    s.stop()
+    s.shutdown()
