@@ -1,11 +1,9 @@
 from pyo import *
-from gpiozero import Button
-import RPi.GPIO as GPIO
-import time
+import keyboard
 
 
 # Initialize server
-s = Server(sr=48000, buffersize=2048, audio='pa', nchnls=1, ichnls=1, duplex=1)
+s = Server(sr=48000, buffersize=1024, audio='portaudio', nchnls=1, ichnls=1, duplex=1)
 s.setInputDevice(1)
 s.setOutputDevice(0)
 
@@ -16,7 +14,7 @@ s.start()
 # User-defined parameters
 bpm = 120
 beats_per_bar = 4
-total_bars = 2
+total_bars = 4
 latency = 0.2  # Latency in seconds
 
 class Metronome:
@@ -113,7 +111,7 @@ class Track:
             self.table = NewTable(length=self.metronome.duration, chnls=self.channels, feedback=self.feedback)
             self.input = Input([0, 1])
             self.recorder = TableRec(self.input, table=self.table, fadetime=0.005)
-            self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=20, xfade=0)
+            self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=1.5, xfade=0)
             self.highpass = ButHP(self.playback, freq=self.hp_freq).out()  # Apply highpass filter
             self.master_trig = CallAfter(self.start_recording, latency)
 
@@ -135,7 +133,7 @@ class Track:
             self.table = NewTable(length=self.metronome.duration, chnls=self.channels, feedback=self.feedback)
             self.input = Input([0, 1])
             self.recorder = TableRec(self.input, table=self.table, fadetime=0.01).out()
-            self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=20, xfade=0)
+            self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=1.5, xfade=0)
             self.highpass = ButHP(self.playback, freq=self.hp_freq).out()  # Apply highpass filter
             self.track_trig = CallAfter(self.start_recording, latency)
             self.initialized = True
@@ -184,74 +182,15 @@ def init_track_5():
 def init_track_6():
     loop_station.init_track(6)
 
+# Bind hotkeys
+keyboard.add_hotkey('m', init_master_track)
+keyboard.add_hotkey('2', init_track_2)
+keyboard.add_hotkey('3', init_track_3)
+keyboard.add_hotkey('4', init_track_4)
+keyboard.add_hotkey('5', init_track_5)
+keyboard.add_hotkey('6', init_track_6)
+
+# Keep the script running to listen for hotkey inputs
+keyboard.wait('esc')  # Press 'esc' to exit the script
 
 
-# Define the GPIO pins for rows and columns of the matrix keypad
-row_pins = [12, 1]
-col_pins = [13, 6, 5]
-
-# Disable GPIO warnings
-GPIO.setwarnings(False)
-
-# Reset the GPIO pins
-GPIO.cleanup()
-
-# Set up the GPIO mode
-GPIO.setmode(GPIO.BCM)
-
-# Initialize buttons for rows with pull-down resistors
-rows = [Button(pin, pull_up=False) for pin in row_pins]
-
-# Set up columns as output and set them to high
-for col in col_pins:
-    GPIO.setup(col, GPIO.OUT)
-    GPIO.output(col, GPIO.HIGH)
-
-# Dictionary to hold the key mapping for matrix keypad
-key_map = {
-    (12, 13): 1, (12, 6): 2, (12, 5): 3,
-    (1, 13): 4, (1, 6): 5, (1, 5): 6
-}
-
-# Map button actions
-def matrix_button_pressed(row_pin):
-    # Disable all column outputs
-    for col in col_pins:
-        GPIO.output(col, GPIO.LOW)
-
-    # Detect which button was pressed
-    for col in col_pins:
-        GPIO.output(col, GPIO.HIGH)
-        time.sleep(0.01)  # Debounce delay
-        if row_pin.is_pressed:
-            key = key_map.get((row_pin.pin.number, col), None)
-            if key:
-                # Call the corresponding function based on the key
-                if key == 1:
-                    init_master_track()
-                elif key == 2:
-                    init_track_2()
-                elif key == 3:
-                    init_track_3()
-                elif key == 4:
-                    init_track_4()
-                elif key == 5:
-                    init_track_5()
-                elif key == 6:
-                    init_track_6()
-        GPIO.output(col, GPIO.LOW)
-
-    # Re-enable all column outputs
-    for col in col_pins:
-        GPIO.output(col, GPIO.HIGH)
-
-# Attach the callback function to the button press event for each row
-for row in rows:
-    row.when_pressed = lambda row=row: matrix_button_pressed(row)
-
-try:
-    print("Listening for button presses on matrix keypad...")
-    while True:
-        time.sleep(0.01)  # Small delay to prevent CPU overuse
-except KeyboardInterrupt:
-    GPIO.cleanup()  # Clean up GPIO on program exit
