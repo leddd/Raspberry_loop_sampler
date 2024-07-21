@@ -5,7 +5,7 @@ import time
 
 
 # Initialize server
-s = Server(sr=48000, buffersize=1024, audio='jack', nchnls=1, ichnls=1, duplex=1)
+s = Server(sr=48000, buffersize=2048, audio='pa', nchnls=1, ichnls=1, duplex=1)
 s.setInputDevice(1)
 s.setOutputDevice(0)
 
