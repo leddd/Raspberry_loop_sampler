@@ -220,8 +220,6 @@ for row in rows:
 try:
     print("Listening for GPIO input...")
     while True:
-        handle_rotary_encoder()
-        handle_encoder_button()
         time.sleep(0.01)
 except KeyboardInterrupt:
     GPIO.cleanup()
