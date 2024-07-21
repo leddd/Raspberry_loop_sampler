@@ -83,5 +83,11 @@ def update_counters():
 trigger = TrigFunc(metronome, update_counters)
 
     
-# Continue running the server
-s.gui(locals())
+try:
+    while True:
+        time.sleep(100)  # Sleep to keep the script alive
+except KeyboardInterrupt:
+    # Graceful shutdown on user interrupt
+    print("Stopping Pyo server...")
+    s.stop()
+    s.shutdown()
