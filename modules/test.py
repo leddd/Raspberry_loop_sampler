@@ -1,7 +1,7 @@
 from pyo import *
 
 # Initialize Pyo server with JACK audio
-s = Server(audio='jack').boot()
+s = Server(audio='portaudio').boot()
 s.start()
 
 # Create an audio effect with a sine wave
