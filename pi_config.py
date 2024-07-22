@@ -79,7 +79,7 @@ def draw_config_screen():
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
     text_x = (64 - text_width) // 2
-    text_y = (128 - text_height) // 2 + 10  # Slightly below center
+    text_y = (128 - text_height) // 2 + 5  # Slightly below center, moved 5 pixels up
 
     # Draw text on the screen
     draw.text((text_x, text_y), value, font=font, fill="white")
