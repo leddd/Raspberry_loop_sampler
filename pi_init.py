@@ -1,13 +1,18 @@
 import time
 import RPi.GPIO as GPIO
+from gpiozero import Button
 from PIL import Image, ImageDraw, ImageFont
 from luma.core.interface.serial import i2c, spi
 from luma.core.render import canvas
 from luma.oled.device import sh1106
+from luma.core.virtual import viewport
+from luma.core.virtual import terminal
+from luma.core.render import canvas
+from PIL import ImageFont
 
 # Initialize I2C interface and OLED display
 serial = i2c(port=1, address=0x3C)
-device = sh1106(serial)
+device = sh1106(serial, rotate=2)  # rotate=2 for 180 degrees (portrait to landscape mode)
 
 # Path to your TTF font file
 font_path = 'fonts/InputSansNarrow-Thin.ttf'
