@@ -30,9 +30,9 @@ for key, paths in beat_images.items():
     beat_images_loaded[key] = [Image.open(path).convert('1') for path in paths]
 
 # Define the GPIO pins for the rotary encoder
-CLK_PIN = 22  # GPIO22 connected to the rotary encoder's CLK pin
+CLK_PIN = 17  # GPIO22 connected to the rotary encoder's CLK pin
 DT_PIN = 27   # GPIO27 connected to the rotary encoder's DT pin
-SW_PIN = 17   # GPIO17 connected to the rotary encoder's SW pin
+SW_PIN = 22   # GPIO17 connected to the rotary encoder's SW pin
 
 # Set up GPIO pins for rotary encoder
 GPIO.setwarnings(False)

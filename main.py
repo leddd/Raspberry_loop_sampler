@@ -2,14 +2,15 @@ from pyo import *
 from gpiozero import Button
 import RPi.GPIO as GPIO
 import time
-
+from luma.core.interface.serial import i2c
+from luma.oled.device import sh1106
+from luma.core.render import canvas
+from PIL import ImageFont, ImageDraw, Image, ImageFont
 
 # Initialize server
 s = Server(sr=48000, buffersize=2048, audio='pa', nchnls=1, ichnls=1, duplex=1)
 s.setInputDevice(1)
 s.setOutputDevice(0)
-
-
 s.boot()
 s.start()
 
@@ -159,99 +160,77 @@ class LoopStation:
         track = Track(self.server, self.metronome)
         track.init_track(self.master_track)
         self.tracks.append(track)
-        print(f"Track {track_num} initialized")
-        
+        print(f"Track {track_num} initialized")    
+class TrackInitializer:
+    def __init__(self, loop_station):
+        self.loop_station = loop_station
+
+    def init_master_track(self):
+        self.loop_station.init_master_track()
+
+    def init_track(self, track_num):
+        self.loop_station.init_track(track_num)
+class GPIOSetup:
+    def __init__(self, track_initializer):
+        self.row_pins = [12, 1]
+        self.col_pins = [13, 6, 5]
+
+        self.key_map = {
+            (1, 13): 1, (1, 6): 2, (1, 5): 3,
+            (12, 13): 4, (12, 6): 5, (12, 5): 6
+        }
+
+        self.track_initializer = track_initializer
+
+        GPIO.setwarnings(False)
+        GPIO.cleanup()
+        GPIO.setmode(GPIO.BCM)
+
+        self.rows = [Button(pin, pull_up=False, bounce_time=0.1) for pin in self.row_pins]
+
+        for col in self.col_pins:
+            GPIO.setup(col, GPIO.OUT)
+            GPIO.output(col, GPIO.HIGH)
+
+        for row in self.rows:
+            row.when_pressed = lambda row=row: self.on_button_pressed(row)
+            row.when_released = lambda row=row: self.on_button_released(row)
+
+    def on_button_pressed(self, row_pin):
+        for col in self.col_pins:
+            GPIO.output(col, GPIO.LOW)
+
+        for col in self.col_pins:
+            GPIO.output(col, GPIO.HIGH)
+            time.sleep(0.01)
+            if row_pin.is_pressed:
+                key = self.key_map.get((row_pin.pin.number, col), None)
+                if key:
+                    if key == 1:
+                        self.track_initializer.init_master_track()
+                    else:
+                        self.track_initializer.init_track(key)
+            GPIO.output(col, GPIO.LOW)
+
+        for col in self.col_pins:
+            GPIO.output(col, GPIO.HIGH)
+
+    def on_button_released(self, row_pin):
+        # Additional logic for button release
+        pass
+    
 # Initialize loop station
 loop_station = LoopStation(s, bpm, beats_per_bar, total_bars)
 
-# Define function to initialize master track
-def init_master_track():
-    loop_station.init_master_track()
+# Initialize track initializer
+track_initializer = TrackInitializer(loop_station)
 
-# Define function to initialize additional tracks
-def init_track_2():
-    loop_station.init_track(2)
-
-def init_track_3():
-    loop_station.init_track(3)
-
-def init_track_4():
-    loop_station.init_track(4)
-
-def init_track_5():
-    loop_station.init_track(5)
-
-def init_track_6():
-    loop_station.init_track(6)
-
-
-
-# Define the GPIO pins for rows and columns of the matrix keypad
-row_pins = [12, 1]
-col_pins = [13, 6, 5]
-
-# Disable GPIO warnings
-GPIO.setwarnings(False)
-
-# Reset the GPIO pins
-GPIO.cleanup()
-
-# Set up the GPIO mode
-GPIO.setmode(GPIO.BCM)
-
-# Initialize buttons for rows with pull-down resistors
-rows = [Button(pin, pull_up=False) for pin in row_pins]
-
-# Set up columns as output and set them to high
-for col in col_pins:
-    GPIO.setup(col, GPIO.OUT)
-    GPIO.output(col, GPIO.HIGH)
-
-# Dictionary to hold the key mapping for matrix keypad
-key_map = {
-    (12, 13): 1, (12, 6): 2, (12, 5): 3,
-    (1, 13): 4, (1, 6): 5, (1, 5): 6
-}
-
-# Map button actions
-def matrix_button_pressed(row_pin):
-    # Disable all column outputs
-    for col in col_pins:
-        GPIO.output(col, GPIO.LOW)
-
-    # Detect which button was pressed
-    for col in col_pins:
-        GPIO.output(col, GPIO.HIGH)
-        time.sleep(0.01)  # Debounce delay
-        if row_pin.is_pressed:
-            key = key_map.get((row_pin.pin.number, col), None)
-            if key:
-                # Call the corresponding function based on the key
-                if key == 1:
-                    init_master_track()
-                elif key == 2:
-                    init_track_2()
-                elif key == 3:
-                    init_track_3()
-                elif key == 4:
-                    init_track_4()
-                elif key == 5:
-                    init_track_5()
-                elif key == 6:
-                    init_track_6()
-        GPIO.output(col, GPIO.LOW)
-
-    # Re-enable all column outputs
-    for col in col_pins:
-        GPIO.output(col, GPIO.HIGH)
-
-# Attach the callback function to the button press event for each row
-for row in rows:
-    row.when_pressed = lambda row=row: matrix_button_pressed(row)
+# Setup GPIO keys
+gpio_setup = GPIOSetup(track_initializer)
 
 try:
     print("Listening for button presses on matrix keypad...")
     while True:
-        time.sleep(0.01)  # Small delay to prevent CPU overuse
+        time.sleep(0.05)
 except KeyboardInterrupt:
-    GPIO.cleanup()  # Clean up GPIO on program exit
+    GPIO.cleanup()
