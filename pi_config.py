@@ -57,29 +57,38 @@ GPIO.setup(SW_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 prev_CLK_state = GPIO.input(CLK_PIN)
 
 def draw_config_screen():
-    with canvas(device) as draw:
-        # Load a custom font
-        font_size = 12  # Adjust the font size as needed
-        font = ImageFont.truetype(font_path, font_size)
+    # Create an image in portrait mode dimensions
+    image = Image.new('1', (64, 128), "black")
+    draw = ImageDraw.Draw(image)
+    
+    # Load a custom font
+    font_size = 12  # Adjust the font size as needed
+    font = ImageFont.truetype(font_path, font_size)
 
-        # Draw config option
-        option = config_options[current_config_option]
-        if option == "BPM":
-            value = f"{config_option_values[option]} BPM"
-        elif option == "TIME SIGNATURE":
-            value = config_option_values[option]
-        elif option == "TOTAL BARS":
-            value = f"{config_option_values[option]} BARS"
+    # Draw config option
+    option = config_options[current_config_option]
+    if option == "BPM":
+        value = f"{config_option_values[option]} BPM"
+    elif option == "TIME SIGNATURE":
+        value = config_option_values[option]
+    elif option == "TOTAL BARS":
+        value = f"{config_option_values[option]} BARS"
 
-        # Calculate text position
-        bbox = draw.textbbox((0, 0), value, font=font)  # Get bounding box
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        text_x = (device.width - text_width) // 2
-        text_y = (device.height - text_height) // 2 + 10  # Slightly below center
+    # Calculate text position
+    bbox = draw.textbbox((0, 0), value, font=font)  # Get bounding box
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    text_x = (64 - text_width) // 2
+    text_y = (128 - text_height) // 2 + 10  # Slightly below center
 
-        # Draw text on the screen
-        draw.text((text_x, text_y), value, font=font, fill="white")
+    # Draw text on the screen
+    draw.text((text_x, text_y), value, font=font, fill="white")
+    
+    # Rotate the image by 90 degrees to fit the landscape display
+    rotated_image = image.rotate(270, expand=True)
+    
+    # Display the rotated image on the device
+    device.display(rotated_image)
 
 # Function to handle rotary encoder
 def handle_rotary_encoder():
@@ -136,7 +145,6 @@ def handle_encoder_button():
             else:
                 # Save settings and exit config
                 print("Configuration complete.")
-                pygame.quit()
                 exit()
             draw_config_screen()
         else:
