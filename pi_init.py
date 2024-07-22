@@ -5,14 +5,10 @@ from PIL import Image, ImageDraw, ImageFont
 from luma.core.interface.serial import i2c, spi
 from luma.core.render import canvas
 from luma.oled.device import sh1106
-from luma.core.virtual import viewport
-from luma.core.virtual import terminal
-from luma.core.render import canvas
-from PIL import ImageFont
 
 # Initialize I2C interface and OLED display
 serial = i2c(port=1, address=0x3C)
-device = sh1106(serial, rotate=2)  # rotate=2 for 180 degrees (portrait to landscape mode)
+device = sh1106(serial)
 
 # Path to your TTF font file
 font_path = 'fonts/InputSansNarrow-Thin.ttf'
@@ -72,40 +68,49 @@ def draw_menu(current_option):
         font_size = 12  # You can adjust the font size as needed
         font = ImageFont.truetype(font_path, font_size)
 
+        # Create a blank image to draw on
+        image = Image.new("RGB", (device.height, device.width))
+        draw_image = ImageDraw.Draw(image)
+
         # Draw menu options
         y_offset = top_margin
         for i, option in enumerate(menu_options):
-            bbox = draw.textbbox((0, 0), option, font=font)  # Get bounding box
+            bbox = draw_image.textbbox((0, 0), option, font=font)  # Get bounding box
             text_width = bbox[2] - bbox[0]
             text_height = bbox[3] - bbox[1]
-            text_x = (device.width - text_width) // 2
+            text_x = (device.height - text_width) // 2
             text_y = y_offset
             if i == current_option:
                 # Draw highlight
                 highlight_rect = [
                     0,  # Start at the left edge of the screen
                     text_y - menu_padding + highlight_offset,  # Adjust to position the highlight a bit lower
-                    device.width,  # End at the right edge of the screen
+                    device.height,  # End at the right edge of the screen
                     text_y + text_height + menu_padding + highlight_offset
                 ]
-                draw.rectangle(highlight_rect, fill="white")
-                draw.text((text_x, text_y), option, font=font, fill="black")  # Draw text in black
+                draw_image.rectangle(highlight_rect, fill="white")
+                draw_image.text((text_x, text_y), option, font=font, fill="black")  # Draw text in black
             else:
-                draw.text((text_x, text_y), option, font=font, fill="white")  # Draw text in white
+                draw_image.text((text_x, text_y), option, font=font, fill="white")  # Draw text in white
             y_offset += text_height + menu_padding * 2
 
         # Draw current settings
         settings = [f"{bpm}BPM", time_signature, f"{total_bars}BARS"]
-        settings_start_y = device.height - bottom_margin - (len(settings) * (text_height + settings_padding * 2))
+        settings_start_y = device.width - bottom_margin - (len(settings) * (text_height + settings_padding * 2))
         y_offset = max(y_offset, settings_start_y)
         for setting in settings:
-            bbox = draw.textbbox((0, 0), setting, font=font)  # Get bounding box
+            bbox = draw_image.textbbox((0, 0), setting, font=font)  # Get bounding box
             text_width = bbox[2] - bbox[0]
             text_height = bbox[3] - bbox[1]
-            text_x = (device.width - text_width) // 2
+            text_x = (device.height - text_width) // 2
             text_y = y_offset
-            draw.text((text_x, text_y), setting, font=font, fill="white")  # Draw text in white
+            draw_image.text((text_x, text_y), setting, font=font, fill="white")  # Draw text in white
             y_offset += text_height + settings_padding * 2
+
+        # Rotate the image 90 degrees clockwise
+        rotated_image = image.rotate(-90, expand=True)
+        # Display the rotated image on the device
+        device.display(rotated_image.convert(device.mode))
 
 # Function to handle rotary encoder
 def handle_rotary_encoder():
