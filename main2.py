@@ -3,7 +3,6 @@ from gpiozero import Button
 import RPi.GPIO as GPIO
 import time
 
-
 class Keypad:
     def __init__(self, row_pins, col_pins, key_map):
         self.row_pins = row_pins
@@ -40,6 +39,7 @@ class Keypad:
         # Re-enable all column outputs
         for col in self.col_pins:
             GPIO.output(col, GPIO.HIGH)
+
 class RotaryEncoder:
     DIRECTION_CW = 0
     DIRECTION_CCW = 1
@@ -51,14 +51,20 @@ class RotaryEncoder:
 
         self.counter = 0
         self.direction = RotaryEncoder.DIRECTION_CW
-        self.prev_clk_state = GPIO.input(clk_pin)
+        self.prev_clk_state = None
         self.button_pressed = False
         self.prev_button_state = GPIO.HIGH
 
+        self.setup_pins()
+
+    def setup_pins(self):
         # Set up GPIO pins for rotary encoder
-        GPIO.setup(clk_pin, GPIO.IN)
-        GPIO.setup(dt_pin, GPIO.IN)
-        GPIO.setup(sw_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        GPIO.setup(self.clk_pin, GPIO.IN)
+        GPIO.setup(self.dt_pin, GPIO.IN)
+        GPIO.setup(self.sw_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+        # Read the initial state of the rotary encoder's CLK pin
+        self.prev_clk_state = GPIO.input(self.clk_pin)
 
     def handle_rotary_encoder(self):
         # Read the current state of the rotary encoder's CLK pin
@@ -130,6 +136,7 @@ keypad, rotary_encoder = setup_gpio()
 s = Server(sr=48000, buffersize=2048, audio='pa', nchnls=1, ichnls=1, duplex=1)
 s.setInputDevice(1)
 s.setOutputDevice(0)
+
 s.boot()
 s.start()
 
