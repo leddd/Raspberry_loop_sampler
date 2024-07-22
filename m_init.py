@@ -1,13 +1,12 @@
-from luma.core.interface.serial import i2c
-from luma.oled.device import sh1106
-from luma.core.render import canvas
-from PIL import ImageFont, ImageDraw, Image
-import RPi.GPIO as GPIO
-import time
+import pygame
+from PIL import Image, ImageDraw, ImageFont
 
-# Initialize the OLED screen
-serial = i2c(port=1, address=0x3C)
-device = sh1106(serial)
+# Initialize pygame
+pygame.init()
+screen_width = 64  # Width of the OLED screen in portrait mode
+screen_height = 128  # Height of the OLED screen in portrait mode
+screen = pygame.display.set_mode((screen_width, screen_height))
+pygame.display.set_caption("OLED Simulation")
 
 # Path to your TTF font file
 font_path = 'fonts/InputSansNarrow-Thin.ttf'
@@ -28,108 +27,75 @@ menu_padding = 8
 settings_padding = 4
 highlight_offset = 2  # Offset of the highlight position
 
-# Define the GPIO pins for the rotary encoder
-CLK_PIN = 22  # GPIO7 connected to the rotary encoder's CLK pin
-DT_PIN = 27   # GPIO8 connected to the rotary encoder's DT pin
-SW_PIN = 17   # GPIO25 connected to the rotary encoder's SW pin
-
-# Set up GPIO pins for rotary encoder
-GPIO.setwarnings(False)
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(CLK_PIN, GPIO.IN)
-GPIO.setup(DT_PIN, GPIO.IN)
-GPIO.setup(SW_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-prev_CLK_state = GPIO.input(CLK_PIN)
-
-# Load a custom font
-font_size = 12  # You can adjust the font size as needed
-font = ImageFont.truetype(font_path, font_size)
-
 def draw_menu(current_option):
-    # Create an image in portrait mode dimensions
-    image = Image.new('1', (64, 128), "black")
+    # Create a blank image and get a drawing context
+    image = Image.new('1', (screen_width, screen_height), color=0)  # '1' mode for 1-bit color depth
     draw = ImageDraw.Draw(image)
-    
+
+    # Load a custom font
+    font_size = 12  # You can adjust the font size as needed
+    font = ImageFont.truetype(font_path, font_size)
+
     # Draw menu options
     y_offset = top_margin
     for i, option in enumerate(menu_options):
         bbox = draw.textbbox((0, 0), option, font=font)  # Get bounding box
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
-        text_x = (64 - text_width) // 2
+        text_x = (screen_width - text_width) // 2
         text_y = y_offset
         if i == current_option:
             # Draw highlight
             highlight_rect = [
                 0,  # Start at the left edge of the screen
                 text_y - menu_padding + highlight_offset,  # Adjust to position the highlight a bit lower
-                64,  # End at the right edge of the screen
+                screen_width,  # End at the right edge of the screen
                 text_y + text_height + menu_padding + highlight_offset
             ]
-            draw.rectangle(highlight_rect, outline="white", fill="white")
-            draw.text((text_x, text_y), option, font=font, fill="black")  # Draw text in black
+            draw.rectangle(highlight_rect, fill=1)
+            draw.text((text_x, text_y), option, font=font, fill=0)  # Draw text in black
         else:
-            draw.text((text_x, text_y), option, font=font, fill="white")  # Draw text in white
+            draw.text((text_x, text_y), option, font=font, fill=1)  # Draw text in white
         y_offset += text_height + menu_padding * 2
 
     # Draw current settings
     settings = [f"{bpm}BPM", time_signature, f"{total_bars}BARS"]
-    settings_start_y = 128 - bottom_margin - (len(settings) * (text_height + settings_padding * 2))
+    settings_start_y = screen_height - bottom_margin - (len(settings) * (text_height + settings_padding * 2))
     y_offset = max(y_offset, settings_start_y)
     for setting in settings:
         bbox = draw.textbbox((0, 0), setting, font=font)  # Get bounding box
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
-        text_x = (64 - text_width) // 2
+        text_x = (screen_width - text_width) // 2
         text_y = y_offset
-        draw.text((text_x, text_y), setting, font=font, fill="white")  # Draw text in white
+        draw.text((text_x, text_y), setting, font=font, fill=1)  # Draw text in white
         y_offset += text_height + settings_padding * 2
 
-    # Rotate the image by 90 degrees to fit the landscape display
-    rotated_image = image.rotate(270, expand=True)
-    
-    # Display the rotated image on the device
-    device.display(rotated_image)
+    # Convert image to a format suitable for pygame
+    pygame_image = pygame.image.fromstring(image.convert('RGB').tobytes(), image.size, 'RGB')
 
-# Function to handle rotary encoder
-def handle_rotary_encoder():
-    global current_option, prev_CLK_state
-
-    # Read the current state of the rotary encoder's CLK pin
-    CLK_state = GPIO.input(CLK_PIN)
-
-    # If the state of CLK is changed, then pulse occurred
-    # React to only the rising edge (from LOW to HIGH) to avoid double count
-    if CLK_state != prev_CLK_state and CLK_state == GPIO.HIGH:
-        # If the DT state is HIGH, the encoder is rotating in counter-clockwise direction
-        # Decrease the counter
-        if GPIO.input(DT_PIN) == GPIO.HIGH:
-            current_option = (current_option - 1) % len(menu_options)
-        else:
-            # The encoder is rotating in clockwise direction => increase the counter
-            current_option = (current_option + 1) % len(menu_options)
-
-        draw_menu(current_option)
-
-    # Save last CLK state
-    prev_CLK_state = CLK_state
-
-# Function to handle button press on rotary encoder
-def handle_encoder_button():
-    button_state = GPIO.input(SW_PIN)
-    if button_state == GPIO.LOW:
-        print("Rotary Encoder Button:: The button is pressed")
-        if current_option == 1:  # CONFIG selected
-            # Handle CONFIG option
-            print("CONFIG option selected")
-            # You can add code here to handle the CONFIG option
+    return pygame_image
 
 try:
-    draw_menu(current_option)
     while True:
-        handle_rotary_encoder()
-        handle_encoder_button()
-        time.sleep(0.01)  # Small delay to prevent CPU overuse
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_a:  # Navigate up
+                    current_option = (current_option - 1) % len(menu_options)
+                elif event.key == pygame.K_d:  # Navigate down
+                    current_option = (current_option + 1) % len(menu_options)
+                elif event.key == pygame.K_RETURN and current_option == 1:  # CONFIG selected
+                    pygame.quit()
+                    import config_screen
+                    exit()
+
+        # Draw the menu
+        menu_surface = draw_menu(current_option)
+        screen.blit(menu_surface, (0, 0))
+        pygame.display.flip()
+
 except KeyboardInterrupt:
-    GPIO.cleanup()  # Clean up GPIO on program exit
+    pygame.quit()
