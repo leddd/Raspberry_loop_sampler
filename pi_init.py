@@ -1,6 +1,5 @@
 import time
 import RPi.GPIO as GPIO
-from gpiozero import Button
 from PIL import Image, ImageDraw, ImageFont
 from luma.core.interface.serial import i2c, spi
 from luma.core.render import canvas
