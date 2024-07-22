@@ -24,8 +24,11 @@ draw.text((30, 40), "Hello World", fill="black")
 # Rotate the image by 90 degrees to achieve portrait mode
 rotated_image = image.rotate(90, expand=True)
 
-# Display the rotated image on the device
-device.display(rotated_image)
+# Ensure the rotated image is the same size as the device's expected size
+cropped_image = rotated_image.crop((0, 0, device.width, device.height))
+
+# Display the cropped image on the device
+device.display(cropped_image)
 
 # Add a delay to keep the graphic on the screen longer
 time.sleep(10)  # Delay for 10 seconds
