@@ -4,18 +4,26 @@ import time
 
 # Initialize pygame
 pygame.init()
-screen_width = 128  # Width of the OLED screen
-screen_height = 64  # Height of the OLED screen
+screen_width = 64  # Width of the OLED screen in portrait mode
+screen_height = 128  # Height of the OLED screen in portrait mode
 screen = pygame.display.set_mode((screen_width, screen_height))
-pygame.display.set_caption("OLED Metronome Countdown")
+pygame.display.set_caption("OLED Beat Countdown")
 
-# Path to your TTF font file and metronome images
+# Path to your TTF font file
 font_path = 'fonts/InputSansNarrow-Thin.ttf'
-metro_images = ['screens/metro1.png', 'screens/metro2.png', 'screens/metro3.png']
 
 # Configuration variables
 total_beats = 4  # Change this value for different total beats
 beat_interval = 0.5  # Time in seconds between beats, can be changed later
+time_signature = "4/4"  # Change this to "2/4", "3/4", or "6/8" as needed
+
+# Dictionary to store image paths for each time signature
+beat_images = {
+    "2/4": ['screens/2-4_1.png', 'screens/2-4_2.png'],
+    "3/4": ['screens/3-4_1.png', 'screens/3-4_2.png', 'screens/3-4_3.png'],
+    "4/4": ['screens/4-4_1.png', 'screens/4-4_2.png', 'screens/4-4_3.png', 'screens/4-4_4.png'],
+    "6/8": ['screens/6-8_1.png', 'screens/6-8_2.png', 'screens/6-8_3.png', 'screens/6-8_4.png', 'screens/6-8_5.png', 'screens/6-8_6.png']
+}
 
 def load_images(paths):
     images = []
@@ -34,7 +42,9 @@ def overlay_text_on_image(image, text):
     font = ImageFont.truetype(font_path, font_size)
 
     # Calculate text position
-    text_width, text_height = draw.textsize(text, font=font)
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
     text_x = (pil_image.width - text_width) // 2
     text_y = (pil_image.height - text_height) // 2
 
@@ -44,9 +54,9 @@ def overlay_text_on_image(image, text):
     # Convert back to a format suitable for pygame
     return pygame.image.fromstring(pil_image.tobytes(), pil_image.size, 'RGB')
 
-def countdown(total_beats, beat_interval, metro_images):
+def countdown(total_beats, beat_interval, beat_images):
     beat_count = total_beats
-    images = load_images(metro_images)
+    images = load_images(beat_images)
 
     try:
         while beat_count > 0:
@@ -55,32 +65,18 @@ def countdown(total_beats, beat_interval, metro_images):
                     pygame.quit()
                     exit()
 
-            # Alternating between left, middle, and right images
-            screen.blit(images[0], (0, 0))  # Left
-            screen.blit(overlay_text_on_image(images[0], str(beat_count)), (0, 0))
+            # Display the current beat image with the countdown number overlay
+            image_index = total_beats - beat_count
+            screen.blit(images[image_index], (0, 0))
+            screen.blit(overlay_text_on_image(images[image_index], str(beat_count)), (0, 0))
             pygame.display.flip()
-            time.sleep(beat_interval / 2)
-
-            screen.blit(images[1], (0, 0))  # Middle
-            screen.blit(overlay_text_on_image(images[1], str(beat_count)), (0, 0))
-            pygame.display.flip()
-            time.sleep(beat_interval / 2)
+            time.sleep(beat_interval)
 
             beat_count -= 1
-
-            if beat_count > 0:
-                screen.blit(images[2], (0, 0))  # Right
-                screen.blit(overlay_text_on_image(images[2], str(beat_count)), (0, 0))
-                pygame.display.flip()
-                time.sleep(beat_interval / 2)
-
-                screen.blit(images[1], (0, 0))  # Middle
-                screen.blit(overlay_text_on_image(images[1], str(beat_count)), (0, 0))
-                pygame.display.flip()
-                time.sleep(beat_interval / 2)
 
     except KeyboardInterrupt:
         pygame.quit()
 
-countdown(total_beats, beat_interval, metro_images)
+# Run the countdown with the selected time signature
+countdown(total_beats, beat_interval, beat_images[time_signature])
 pygame.quit()
