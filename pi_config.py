@@ -72,7 +72,9 @@ def draw_config_screen():
             value = f"{config_option_values[option]} BARS"
 
         # Calculate text position
-        text_width, text_height = draw.textsize(value, font=font)
+        bbox = draw.textbbox((0, 0), value, font=font)  # Get bounding box
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
         text_x = (device.width - text_width) // 2
         text_y = (device.height - text_height) // 2 + 10  # Slightly below center
 
