@@ -1,7 +1,7 @@
 from luma.core.interface.serial import i2c
 from luma.oled.device import sh1106
 from luma.core.render import canvas
-from PIL import ImageFont
+from PIL import ImageFont, ImageDraw
 import RPi.GPIO as GPIO
 import time
 
@@ -42,13 +42,12 @@ GPIO.setup(SW_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 prev_CLK_state = GPIO.input(CLK_PIN)
 
-def draw_menu(current_option):
-    # Create a blank image and get a drawing context
-    with canvas(device) as draw:
-        # Load a custom font
-        font_size = 12  # You can adjust the font size as needed
-        font = ImageFont.truetype(font_path, font_size)
+# Load a custom font
+font_size = 12  # You can adjust the font size as needed
+font = ImageFont.truetype(font_path, font_size)
 
+def draw_menu(current_option):
+    with canvas(device) as draw:
         # Draw menu options
         y_offset = top_margin
         for i, option in enumerate(menu_options):
