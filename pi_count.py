@@ -27,7 +27,7 @@ beat_images = {
 # Load the beat images
 beat_images_loaded = {}
 for key, paths in beat_images.items():
-    beat_images_loaded[key] = [Image.open(path).convert('1').rotate(270, expand=True) for path in paths]
+    beat_images_loaded[key] = [Image.open(path).convert('1') for path in paths]
 
 # Define the GPIO pins for the rotary encoder
 CLK_PIN = 22  # GPIO22 connected to the rotary encoder's CLK pin
@@ -45,30 +45,37 @@ prev_CLK_state = GPIO.input(CLK_PIN)
 button_pressed = False
 
 def draw_countdown_image(image, text):
-    # Draw the text on the rotated image
-    draw = ImageDraw.Draw(image)
-
+    # Create a new image for drawing text in portrait mode dimensions
+    temp_image = Image.new('1', (64, 128), "black")
+    draw = ImageDraw.Draw(temp_image)
+    
+    # Paste the beat image onto the temporary image
+    temp_image.paste(image, (0, 0))
+    
     # Load a custom font
     font_size = 30  # Adjust the font size as needed
     font = ImageFont.truetype(font_path, font_size)
-
+    
     # Calculate text position
     bbox = draw.textbbox((0, 0), text, font=font)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
-    text_x = (image.width - text_width) // 2
-    text_y = (image.height - text_height) // 2
-
+    text_x = (64 - text_width) // 2
+    text_y = (128 - text_height) // 2
+    
     # Draw text on the image
     draw.text((text_x, text_y), text, font=font, fill="white")  # White text
-
-    # Display the image on the OLED screen
-    device.display(image)
+    
+    # Rotate the image by 90 degrees to fit the landscape display
+    rotated_image = temp_image.rotate(270, expand=True)
+    
+    # Display the rotated image on the device
+    device.display(rotated_image)
 
 def countdown(total_beats, beat_interval, beat_images):
     beat_count = total_beats
     images = beat_images_loaded[time_signature]
-
+    
     try:
         while beat_count > 0:
             # Display the current beat image with the countdown number overlay
@@ -76,16 +83,16 @@ def countdown(total_beats, beat_interval, beat_images):
             draw_countdown_image(images[image_index], str(beat_count))
             time.sleep(beat_interval)
             beat_count -= 1
-
+    
     except KeyboardInterrupt:
         GPIO.cleanup()
 
 def handle_rotary_encoder():
     global prev_CLK_state, button_pressed, total_beats, beat_interval, time_signature
-
+    
     # Read the current state of the rotary encoder's CLK pin
     CLK_state = GPIO.input(CLK_PIN)
-
+    
     # If the state of CLK is changed, then pulse occurred
     if CLK_state != prev_CLK_state and CLK_state == GPIO.HIGH:
         # If the DT state is HIGH, the encoder is rotating in counter-clockwise direction
@@ -93,10 +100,10 @@ def handle_rotary_encoder():
             total_beats = max(1, total_beats - 1)
         else:
             total_beats = min(8, total_beats + 1)
-
+    
     # Save last CLK state
     prev_CLK_state = CLK_state
-
+    
     # Handle button press
     button_state = GPIO.input(SW_PIN)
     if button_state == GPIO.LOW and not button_pressed:
