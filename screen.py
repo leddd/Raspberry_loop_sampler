@@ -9,8 +9,8 @@ import time  # Import the time module
 # substitute bitbang_6800(RS=7, E=8, PINS=[25,24,23,27]) below if using that interface
 serial = i2c(port=1, address=0x3C)
 
-# substitute ssd1331(...) or sh1106(...) below if using that device
-device = sh1106(serial)
+# Initialize the sh1106 device in portrait mode
+device = sh1106(serial, width=64, height=128, rotate=1)  # Use rotate=3 for 270° rotation
 
 with canvas(device) as draw:
     draw.rectangle(device.bounding_box, outline="black", fill="white")
