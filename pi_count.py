@@ -27,7 +27,7 @@ beat_images = {
 # Load the beat images
 beat_images_loaded = {}
 for key, paths in beat_images.items():
-    beat_images_loaded[key] = [Image.open(path).convert('1') for path in paths]
+    beat_images_loaded[key] = [Image.open(path).convert('1').rotate(270, expand=True) for path in paths]
 
 # Define the GPIO pins for the rotary encoder
 CLK_PIN = 22  # GPIO22 connected to the rotary encoder's CLK pin
@@ -45,9 +45,8 @@ prev_CLK_state = GPIO.input(CLK_PIN)
 button_pressed = False
 
 def draw_countdown_image(image, text):
-    # Create a new image for drawing text in portrait mode dimensions
-    temp_image = Image.new('1', (64, 128), "black")
-    draw = ImageDraw.Draw(temp_image)
+    # Draw the text on the rotated image
+    draw = ImageDraw.Draw(image)
 
     # Load a custom font
     font_size = 30  # Adjust the font size as needed
@@ -57,17 +56,14 @@ def draw_countdown_image(image, text):
     bbox = draw.textbbox((0, 0), text, font=font)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
-    text_x = (64 - text_width) // 2
-    text_y = (128 - text_height) // 2
+    text_x = (image.width - text_width) // 2
+    text_y = (image.height - text_height) // 2
 
     # Draw text on the image
     draw.text((text_x, text_y), text, font=font, fill="white")  # White text
 
-    # Rotate the image by 90 degrees to fit the landscape display
-    rotated_image = temp_image.rotate(270, expand=True)
-
-    # Display the rotated image on the device
-    device.display(rotated_image)
+    # Display the image on the OLED screen
+    device.display(image)
 
 def countdown(total_beats, beat_interval, beat_images):
     beat_count = total_beats
