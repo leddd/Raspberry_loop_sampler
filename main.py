@@ -18,7 +18,7 @@ s.start()
 bpm = 120
 beats_per_bar = 4
 total_bars = 2
-latency = 0.05  # Latency in seconds
+latency = 0  # Latency in seconds
 
 class Metronome:
     def __init__(self, bpm, beats_per_bar, total_bars):
@@ -89,7 +89,7 @@ class Track:
         self.recorder = None
         self.initialized = False  # Flag to ensure initialization only happens once
         self.hp_freq = 400  # Highpass filter frequency
-        self.lp_freq = 3000 # Lowpass filter frequency
+        self.lp_freq = 4000 # Lowpass filter frequency
 
     def start_recording(self):
         self.recorder.play()
@@ -118,7 +118,7 @@ class Track:
             self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=20, xfade=0)
             self.highpass = ButHP(self.playback, freq=self.hp_freq) # Apply highpass filter
             self.lowpass = ButLP(self.highpass, freq=self.lp_freq)
-            self.ex = Expand(self.lowpass, downthresh=-80, upthresh=-80, ratio=2, mul=0.15).out()
+            self.ex = Expand(self.lowpass, downthresh=-90, upthresh=-90, ratio=2, mul=0.1).out()
             # self.harm = Harmonizer(self.playback, transpo=-12, winsize=0.05).out()
             self.master_trig = CallAfter(self.start_recording, latency)
 
@@ -143,7 +143,7 @@ class Track:
             self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=20, xfade=0)
             self.highpass = ButHP(self.playback, freq=self.hp_freq) # Apply highpass filter
             self.lowpass = ButLP(self.highpass, freq=self.lp_freq)
-            self.ex = Expand(self.lowpass, downthresh=-80, upthresh=-80, ratio=2, mul=0.15).out()
+            self.ex = Expand(self.lowpass, downthresh=-90, upthresh=-90, ratio=2, mul=0.1).out()
             self.track_trig = CallAfter(self.start_recording, latency)
             self.initialized = True
         
