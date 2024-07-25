@@ -72,10 +72,12 @@ class RotaryEncoderConfig:
 
     def handle_rotary_encoder(self):
         CLK_state = GPIO.input(self.CLK_PIN)
-        if CLK_state != self.prev_CLK_state and CLK_state == GPIO.HIGH:
+        if CLK_state != self.prev_CLK_state:
             if GPIO.input(self.DT_PIN) == GPIO.HIGH:
+                self.counter -= 1
                 self.direction = self.DIRECTION_CCW
             else:
+                self.counter += 1
                 self.direction = self.DIRECTION_CW
 
             if self.direction == self.DIRECTION_CW:
@@ -121,7 +123,7 @@ class RotaryEncoderConfig:
             while True:
                 self.handle_rotary_encoder()
                 self.handle_encoder_button()
-                time.sleep(0.01)
+                time.sleep(0.001)  # Reduced delay to improve responsiveness
         except KeyboardInterrupt:
             GPIO.cleanup()
 
