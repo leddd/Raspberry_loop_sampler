@@ -116,7 +116,7 @@ class Track:
             self.input = Input([0, 1])
             self.recorder = TableRec(self.input, table=self.table, fadetime=0.005)
             self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=20, xfade=0)
-            self.band = ButBP(self.playback, freq=800).out()
+            self.band = ButBP(self.playback, freq=500).out()
             self.harm = Harmonizer(self.playback, transpo=-12, winsize=0.05).out()
             self.master_trig = CallAfter(self.start_recording, latency)
 
