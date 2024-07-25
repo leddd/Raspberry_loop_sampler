@@ -44,7 +44,7 @@ GPIO.cleanup()
 GPIO.setmode(GPIO.BCM)
 
 # Define the GPIO pins for the rotary encoder
-CLK_PIN = 17  # GPIO22 connected to the rotary encoder's CLK pin
+CLK_PIN = 17  # GPIO17 connected to the rotary encoder's CLK pin
 DT_PIN = 27   # GPIO27 connected to the rotary encoder's DT pin
 
 # Set up GPIO pins for rotary encoder
@@ -93,7 +93,11 @@ def handle_rotary_encoder():
     global counter, direction, prev_CLK_state, current_config_option
 
     # Read the current state of the rotary encoder's CLK pin
-    CLK_state = GPIO.input(CLK_PIN)
+    try:
+        CLK_state = GPIO.input(CLK_PIN)
+    except RuntimeError as e:
+        print(f"Error reading CLK_PIN: {e}")
+        return
 
     # If the state of CLK is changed, then pulse occurred
     # React to only the rising edge (from LOW to HIGH) to avoid double count
