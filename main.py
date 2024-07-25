@@ -118,7 +118,7 @@ class Track:
             self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=20, xfade=0)
             self.highpass = ButHP(self.playback, freq=self.hp_freq) # Apply highpass filter
             self.lowpass = ButLP(self.highpass, freq=self.lp_freq)
-            self.ex = Expand(self.lowpass, downthresh=-80, upthresh=-80, ratio=2, mul=0.25).out()
+            self.ex = Expand(self.lowpass, downthresh=-80, upthresh=-80, ratio=2, mul=0.15).out()
             # self.harm = Harmonizer(self.playback, transpo=-12, winsize=0.05).out()
             self.master_trig = CallAfter(self.start_recording, latency)
 
@@ -143,7 +143,7 @@ class Track:
             self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=20, xfade=0)
             self.highpass = ButHP(self.playback, freq=self.hp_freq) # Apply highpass filter
             self.lowpass = ButLP(self.highpass, freq=self.lp_freq)
-            self.ex = Expand(self.lowpass, downthresh=-80, upthresh=-80, ratio=2, mul=0.25).out()
+            self.ex = Expand(self.lowpass, downthresh=-80, upthresh=-80, ratio=2, mul=0.15).out()
             self.track_trig = CallAfter(self.start_recording, latency)
             self.initialized = True
         
