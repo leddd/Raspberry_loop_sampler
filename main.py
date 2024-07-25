@@ -89,7 +89,7 @@ class Track:
         self.recorder = None
         self.initialized = False  # Flag to ensure initialization only happens once
         self.hp_freq = 400  # Highpass filter frequency
-        self.lp_freq = 4000 # Lowpass filter frequency
+        self.lp_freq = 3000 # Lowpass filter frequency
 
     def start_recording(self):
         self.recorder.play()
