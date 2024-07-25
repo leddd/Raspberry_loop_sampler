@@ -118,7 +118,7 @@ class Track:
             self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=20, xfade=0)
             self.highpass = ButHP(self.playback, freq=self.hp_freq)  # Apply highpass filter
             self.lowpass = ButLP(self.playback, freq=self.lp_freq)
-            self.harm = Harmonizer(self.playback, transpo=-12, winsize=0.05)
+            self.harm = Harmonizer(self.playback, transpo=-12, winsize=0.05).out()
             self.master_trig = CallAfter(self.start_recording, latency)
 
         if self.metronome.countdown_counter.get() == self.metronome.beats_per_bar * (1 + self.metronome.total_bars) + 1:
