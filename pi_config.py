@@ -2,7 +2,7 @@ import time
 import RPi.GPIO as GPIO
 from gpiozero import Button
 from PIL import Image, ImageDraw, ImageFont
-from luma.core.interface.serial import i2c
+from luma.core.interface.serial import i2c, spi
 from luma.core.render import canvas
 from luma.oled.device import sh1106
 
@@ -44,12 +44,14 @@ GPIO.cleanup()
 GPIO.setmode(GPIO.BCM)
 
 # Define the GPIO pins for the rotary encoder
-CLK_PIN = 17  # GPIO17 connected to the rotary encoder's CLK pin
+CLK_PIN = 17  # GPIO22 connected to the rotary encoder's CLK pin
 DT_PIN = 27   # GPIO27 connected to the rotary encoder's DT pin
+SW_PIN = 22   # GPIO17 connected to the rotary encoder's SW pin
 
 # Set up GPIO pins for rotary encoder
 GPIO.setup(CLK_PIN, GPIO.IN)
 GPIO.setup(DT_PIN, GPIO.IN)
+GPIO.setup(SW_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 # Read the initial state of the rotary encoder's CLK pin
 prev_CLK_state = GPIO.input(CLK_PIN)
@@ -93,11 +95,7 @@ def handle_rotary_encoder():
     global counter, direction, prev_CLK_state, current_config_option
 
     # Read the current state of the rotary encoder's CLK pin
-    try:
-        CLK_state = GPIO.input(CLK_PIN)
-    except RuntimeError as e:
-        print(f"Error reading CLK_PIN: {e}")
-        return
+    CLK_state = GPIO.input(CLK_PIN)
 
     # If the state of CLK is changed, then pulse occurred
     # React to only the rising edge (from LOW to HIGH) to avoid double count
@@ -132,69 +130,34 @@ def handle_rotary_encoder():
     # Save last CLK state
     prev_CLK_state = CLK_state
 
-class GPIOSetup:
-    def __init__(self):
-        self.row_pins = [12, 1]
-        self.col_pins = [13, 6, 5]
-
-        self.key_map = {
-            (1, 13): 1, (1, 6): 2, (1, 5): 3,
-            (12, 13): 4, (12, 6): 5, (12, 5): 6
-        }
-
-        GPIO.setwarnings(False)
-        GPIO.cleanup()
-        GPIO.setmode(GPIO.BCM)
-
-        self.rows = [Button(pin, pull_up=False, bounce_time=0.05) for pin in self.row_pins]
-
-        for col in self.col_pins:
-            GPIO.setup(col, GPIO.OUT)
-            GPIO.output(col, GPIO.HIGH)
-
-        for row in self.rows:
-            row.when_pressed = lambda row=row: self.on_button_pressed(row)
-            row.when_released = lambda row=row: self.on_button_released(row)
-
-    def on_button_pressed(self, row_pin):
-        for col in self.col_pins:
-            GPIO.output(col, GPIO.LOW)
-
-        for col in self.col_pins:
-            GPIO.output(col, GPIO.HIGH)
-            time.sleep(0.01)
-            if row_pin.is_pressed:
-                key = self.key_map.get((row_pin.pin.number, col), None)
-                if key:
-                    if key == 1:
-                        handle_encoder_button()
-                break  # Exit the loop after detecting the key press
-            GPIO.output(col, GPIO.LOW)
-
-        for col in self.col_pins:
-            GPIO.output(col, GPIO.HIGH)
-
-    def on_button_released(self, row_pin):
-        # Additional logic for button release
-        pass
-
+# Function to handle button press on rotary encoder
 def handle_encoder_button():
     global button_pressed, prev_button_state, current_config_option
-    button_pressed = True
-    if current_config_option < len(config_options) - 1:
-        current_config_option += 1
-    else:
-        # Save settings and exit config
-        print("Configuration complete.")
-        exit()
-    draw_config_screen()
+
+    # State change detection for the button
+    button_state = GPIO.input(SW_PIN)
+    if button_state != prev_button_state:
+        time.sleep(0.01)  # Add a small delay to debounce
+        if button_state == GPIO.LOW:
+            button_pressed = True
+            if current_config_option < len(config_options) - 1:
+                current_config_option += 1
+            else:
+                # Save settings and exit config
+                print("Configuration complete.")
+                exit()
+            draw_config_screen()
+        else:
+            button_pressed = False
+
+    prev_button_state = button_state
 
 try:
-    gpio_setup = GPIOSetup()
-    print("Listening for button presses on matrix keypad and rotary encoder changes...")
+    print(f"Listening for rotary encoder changes...")
     draw_config_screen()
     while True:
         handle_rotary_encoder()
+        handle_encoder_button()
         time.sleep(0.01)  # Small delay to prevent CPU overuse
 except KeyboardInterrupt:
     GPIO.cleanup()  # Clean up GPIO on program exit
