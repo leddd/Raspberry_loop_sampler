@@ -44,6 +44,7 @@ class RotaryEncoderConfig:
         GPIO.setup(self.DT_PIN, GPIO.IN)
         GPIO.setup(self.SW_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         self.prev_CLK_state = GPIO.input(self.CLK_PIN)
+        self.prev_DT_state = GPIO.input(self.DT_PIN)
 
     def draw_config_screen(self):
         image = Image.new('1', (64, 128), "black")
@@ -72,13 +73,15 @@ class RotaryEncoderConfig:
 
     def handle_rotary_encoder(self):
         CLK_state = GPIO.input(self.CLK_PIN)
+        DT_state = GPIO.input(self.DT_PIN)
+
         if CLK_state != self.prev_CLK_state:
-            if GPIO.input(self.DT_PIN) == GPIO.HIGH:
-                self.counter -= 1
-                self.direction = self.DIRECTION_CCW
-            else:
+            if DT_state != CLK_state:
                 self.counter += 1
                 self.direction = self.DIRECTION_CW
+            else:
+                self.counter -= 1
+                self.direction = self.DIRECTION_CCW
 
             if self.direction == self.DIRECTION_CW:
                 if self.current_config_option == 0:
@@ -98,7 +101,9 @@ class RotaryEncoderConfig:
                     self.config_option_values["TOTAL BARS"] = max(1, self.config_option_values["TOTAL BARS"] - 1)
 
             self.draw_config_screen()
+
         self.prev_CLK_state = CLK_state
+        self.prev_DT_state = DT_state
 
     def handle_encoder_button(self):
         button_state = GPIO.input(self.SW_PIN)
@@ -123,7 +128,7 @@ class RotaryEncoderConfig:
             while True:
                 self.handle_rotary_encoder()
                 self.handle_encoder_button()
-                time.sleep(0.001)  # Reduced delay to improve responsiveness
+                time.sleep(0.001)
         except KeyboardInterrupt:
             GPIO.cleanup()
 
