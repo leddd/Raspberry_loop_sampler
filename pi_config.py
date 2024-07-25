@@ -26,6 +26,7 @@ class RotaryEncoderConfig:
         self.direction = self.DIRECTION_CW
         self.CLK_state = 0
         self.prev_CLK_state = GPIO.HIGH
+        self.prev_DT_state = GPIO.HIGH
         self.button_pressed = False
         self.prev_button_state = GPIO.HIGH
 
