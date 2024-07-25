@@ -88,7 +88,8 @@ class Track:
         self.playback = None
         self.recorder = None
         self.initialized = False  # Flag to ensure initialization only happens once
-        self.hp_freq = 650  # Highpass filter frequency
+        self.hp_freq = 450  # Highpass filter frequency
+        self.lp_freq = 4500 # Lowpass filter frequency
 
     def start_recording(self):
         self.recorder.play()
@@ -116,6 +117,7 @@ class Track:
             self.recorder = TableRec(self.input, table=self.table, fadetime=0.005)
             self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=20, xfade=0)
             self.highpass = ButHP(self.playback, freq=self.hp_freq).out()  # Apply highpass filter
+            self.lowpass = ButLP(self.playback, freq=self.lp_freq).out()
             self.master_trig = CallAfter(self.start_recording, latency)
 
         if self.metronome.countdown_counter.get() == self.metronome.beats_per_bar * (1 + self.metronome.total_bars) + 1:
@@ -138,6 +140,7 @@ class Track:
             self.recorder = TableRec(self.input, table=self.table, fadetime=0.01).out()
             self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=20, xfade=0)
             self.highpass = ButHP(self.playback, freq=self.hp_freq).out()  # Apply highpass filter
+            self.lowpass = ButLP(self.playback, freq=self.lp_freq).out()
             self.track_trig = CallAfter(self.start_recording, latency)
             self.initialized = True
         
