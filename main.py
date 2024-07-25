@@ -96,7 +96,7 @@ class Track:
         print("Recording...")
 
     def start_playback(self):
-        self.harm.out()
+        self.band.out()
         print("Playback...")
 
     def stop_playback(self):
@@ -116,8 +116,7 @@ class Track:
             self.input = Input([0, 1])
             self.recorder = TableRec(self.input, table=self.table, fadetime=0.005)
             self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=20, xfade=0)
-            self.highpass = ButHP(self.playback, freq=self.hp_freq)  # Apply highpass filter
-            self.lowpass = ButLP(self.playback, freq=self.lp_freq)
+            self.band = ButBP(self.playback, freq=800).out()
             self.harm = Harmonizer(self.playback, transpo=-12, winsize=0.05).out()
             self.master_trig = CallAfter(self.start_recording, latency)
 
