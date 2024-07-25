@@ -96,7 +96,7 @@ class Track:
         print("Recording...")
 
     def start_playback(self):
-        self.playback.out()
+        self.playback.play()
         print("Playback...")
 
     def stop_playback(self):
