@@ -142,7 +142,7 @@ class Track:
             self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=20, xfade=0)
             self.highpass = ButHP(self.playback, freq=self.hp_freq).out()  # Apply highpass filter
             self.lowpass = ButLP(self.playback, freq=self.lp_freq).out()
-            self.ex = Expand(self.playback, downthresh=20, upthresh=-21, ratio=4, mul=0.5).out()
+            self.ex = Expand(self.playback, downthresh=30, upthresh=-31, ratio=4, mul=0.5).out()
             self.track_trig = CallAfter(self.start_recording, latency)
             self.initialized = True
         
