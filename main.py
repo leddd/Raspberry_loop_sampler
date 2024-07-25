@@ -18,7 +18,7 @@ s.start()
 bpm = 120
 beats_per_bar = 4
 total_bars = 2
-latency = 0  # Latency in seconds
+latency = 0.05  # Latency in seconds
 
 class Metronome:
     def __init__(self, bpm, beats_per_bar, total_bars):
