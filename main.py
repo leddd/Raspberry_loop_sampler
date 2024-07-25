@@ -193,7 +193,7 @@ class GPIOSetup:
         GPIO.cleanup()
         GPIO.setmode(GPIO.BCM)
 
-        self.rows = [Button(pin, pull_up=False, bounce_time=0.1) for pin in self.row_pins]
+        self.rows = [Button(pin, pull_up=False, bounce_time=0.05) for pin in self.row_pins]
 
         for col in self.col_pins:
             GPIO.setup(col, GPIO.OUT)
@@ -217,6 +217,7 @@ class GPIOSetup:
                         self.track_initializer.init_master_track()
                     else:
                         self.track_initializer.init_track(key)
+                break  # Exit the loop after detecting the key press
             GPIO.output(col, GPIO.LOW)
 
         for col in self.col_pins:
@@ -225,7 +226,8 @@ class GPIOSetup:
     def on_button_released(self, row_pin):
         # Additional logic for button release
         pass
-    
+
+# Example usage
 # Initialize loop station
 loop_station = LoopStation(s, bpm, beats_per_bar, total_bars)
 
