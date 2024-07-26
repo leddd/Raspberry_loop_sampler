@@ -23,8 +23,7 @@ current_config_option = 0
 
 counter = 0
 direction = DIRECTION_CW
-CLK_state = 0
-prev_CLK_state = 0
+prev_CLK_state = GPIO.HIGH
 
 button_pressed = False
 prev_button_state = GPIO.HIGH
@@ -45,11 +44,10 @@ GPIO.setup(SW_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 # Read the initial state of the rotary encoder's CLK pin
 prev_CLK_state = GPIO.input(CLK_PIN)
-prev_DT_state = GPIO.input(DT_PIN)
 
 # Function to handle rotary encoder
 def handle_rotary_encoder():
-    global counter, direction, prev_CLK_state, prev_DT_state, current_config_option
+    global counter, direction, prev_CLK_state, current_config_option
 
     # Read the current state of the rotary encoder's CLK and DT pins
     CLK_state = GPIO.input(CLK_PIN)
@@ -94,9 +92,8 @@ def handle_rotary_encoder():
 
         print(f"{option}: {config_option_values[option]}")
 
-    # Save last CLK and DT state
+    # Save last CLK state
     prev_CLK_state = CLK_state
-    prev_DT_state = DT_state
 
 # Function to handle button press on rotary encoder
 def handle_encoder_button():
