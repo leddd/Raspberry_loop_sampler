@@ -5,93 +5,6 @@ from gpiozero import Button
 from PIL import Image, ImageDraw, ImageFont
 from luma.core.interface.serial import i2c
 from luma.oled.device import sh1106
-def setup_rotary_encoder():
-    global CLK_PIN, DT_PIN, SW_PIN, DIRECTION_CW, DIRECTION_CCW, prev_CLK_state, lock, direction, counter, button_pressed, prev_button_state
-
-    # Define the GPIO pins for the rotary encoder
-    CLK_PIN = 17  # GPIO7 connected to the rotary encoder's CLK pin
-    DT_PIN = 27   # GPIO8 connected to the rotary encoder's DT pin
-    SW_PIN = 22   # GPIO25 connected to the rotary encoder's SW pin
-
-    DIRECTION_CW = 0
-    DIRECTION_CCW = 1
-
-    counter = 0
-    direction = DIRECTION_CW
-    prev_CLK_state = GPIO.HIGH
-    button_pressed = False
-    prev_button_state = GPIO.HIGH
-
-    lock = threading.Lock()
-    
-    # Disable GPIO warnings
-    GPIO.setwarnings(False)
-
-    # Reset the GPIO pins
-    GPIO.cleanup()
-
-    # Set up the GPIO mode
-    GPIO.setmode(GPIO.BCM)
-
-    # Set up GPIO pins for rotary encoder
-    GPIO.setup(CLK_PIN, GPIO.IN)
-    GPIO.setup(DT_PIN, GPIO.IN)
-    GPIO.setup(SW_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-    # Read the initial state of the rotary encoder's CLK pin
-    prev_CLK_state = GPIO.input(CLK_PIN)
-
-def setup_matrix_keypad():
-    global row_pins, col_pins, rows, key_map, debounce_time
-    debounce_time = 0.05  # 50 ms debounce time
-
-    # Define the GPIO pins for rows and columns of the matrix keypad
-    row_pins = [12, 1]
-    col_pins = [13, 6, 5]
-
-    # Initialize buttons for rows with pull-down resistors
-    rows = [Button(pin, pull_up=False) for pin in row_pins]
-
-    # Set up columns as output and set them to high
-    for col in col_pins:
-        GPIO.setup(col, GPIO.OUT)
-        GPIO.output(col, GPIO.HIGH)
-
-    # Dictionary to hold the key mapping for matrix keypad
-    key_map = {
-        (1, 13): 1, (1, 6): 2, (1, 5): 3,
-        (12, 13): 4, (12, 6): 5, (12, 5): 6
-    }
-
-    # Attach the callback function to the button press event for each row
-    for row in rows:
-        row.when_pressed = lambda row=row: matrix_button_pressed(row)
-
-def matrix_button_pressed(row_pin):
-    global current_config_option
-
-    # Disable all column outputs
-    for col in col_pins:
-        GPIO.output(col, GPIO.LOW)
-
-    # Detect which button was pressed
-    for col in col_pins:
-        GPIO.output(col, GPIO.HIGH)
-        time.sleep(debounce_time)  # Debounce delay
-        if row_pin.is_pressed:
-            key = key_map.get((row_pin.pin.number, col), None)
-            if key:
-                print(f"Matrix Keypad:: Key pressed: {key}")
-                if key == 1:  # Advance configuration option when key 1 is pressed
-                    with lock:
-                        current_config_option = (current_config_option + 1) % len(config_options)
-                        print(f"Switched to: {config_options[current_config_option]}")
-        GPIO.output(col, GPIO.LOW)
-
-    # Re-enable all column outputs
-    for col in col_pins:
-        GPIO.output(col, GPIO.HIGH)
-
 
 # Global Variables and Constants
 DIRECTION_CW = 0
@@ -149,6 +62,61 @@ prev_CLK_state = GPIO.input(CLK_PIN)
 # Set up locks and other variables
 lock = threading.Lock()
 in_config_menu = False
+
+def setup_matrix_keypad():
+    global row_pins, col_pins, rows, key_map, debounce_time
+    debounce_time = 0.05  # 50 ms debounce time
+
+    # Define the GPIO pins for rows and columns of the matrix keypad
+    row_pins = [12, 1]
+    col_pins = [13, 6, 5]
+
+    # Initialize buttons for rows with pull-down resistors
+    rows = [Button(pin, pull_up=False) for pin in row_pins]
+
+    # Set up columns as output and set them to high
+    for col in col_pins:
+        GPIO.setup(col, GPIO.OUT)
+        GPIO.output(col, GPIO.HIGH)
+
+    # Dictionary to hold the key mapping for matrix keypad
+    key_map = {
+        (1, 13): 1, (1, 6): 2, (1, 5): 3,
+        (12, 13): 4, (12, 6): 5, (12, 5): 6
+    }
+
+    # Attach the callback function to the button press event for each row
+    for row in rows:
+        row.when_pressed = lambda row=row: matrix_button_pressed(row)
+
+def matrix_button_pressed(row_pin):
+    global current_option, in_config_menu, current_config_option
+
+    # Disable all column outputs
+    for col in col_pins:
+        GPIO.output(col, GPIO.LOW)
+
+    # Detect which button was pressed
+    for col in col_pins:
+        GPIO.output(col, GPIO.HIGH)
+        time.sleep(debounce_time)  # Debounce delay
+        if row_pin.is_pressed:
+            key = key_map.get((row_pin.pin.number, col), None)
+            if key:
+                print(f"Matrix Keypad:: Key pressed: {key}")
+                if key == 1:  # Advance option when key 1 is pressed
+                    with lock:
+                        if in_config_menu:
+                            current_config_option = (current_config_option + 1) % len(config_options)
+                            print(f"Switched to: {config_options[current_config_option]}")
+                        else:
+                            if menu_options[current_option] == "CONFIG":
+                                in_config_menu = True
+        GPIO.output(col, GPIO.LOW)
+
+    # Re-enable all column outputs
+    for col in col_pins:
+        GPIO.output(col, GPIO.HIGH)
 
 def draw_menu(current_option):
     image = Image.new('1', (64, 128), "black")
