@@ -35,6 +35,7 @@ beat_images_loaded = {}
 for key, paths in beat_images.items():
     beat_images_loaded[key] = [Image.open(path).convert('1') for path in paths]
 
+# Metronome class
 class Metronome:
     def __init__(self, bpm, beats_per_bar, total_bars):
         self.update_params(bpm, beats_per_bar, total_bars)
@@ -97,6 +98,7 @@ class Metronome:
             else:
                 self.fclick2.play()
 
+# Track class
 class Track:
     def __init__(self, server, metronome, channels=2, feedback=0.5):
         self.server = server
@@ -129,7 +131,7 @@ class Track:
             beat_count = int(self.metronome.countdown_counter.get())
             image_index = beat_count - 1
             beat_image = beat_images_loaded[self.metronome.time_signature][image_index]
-            draw_countdown_screen(beat_count, beat_image)
+            display_countdown_screen(beat_count, beat_image)
     
     def print_beat(self):
         print("Current beat:", self.metronome.current_beat.get())
@@ -175,6 +177,7 @@ class Track:
     def init_track(self, master):
         self.trig_rec = TrigFunc(master.playback['trig'], self.rec_track)
 
+# LoopStation class
 class LoopStation:
     def __init__(self, server, config_option_values):
         self.server = server
@@ -211,106 +214,6 @@ class TrackInitializer:
     def init_track(self, track_num):
         self.loop_station.init_track(track_num)
 
-def setup_rotary_encoder():
-    global CLK_PIN, DT_PIN, SW_PIN, DIRECTION_CW, DIRECTION_CCW, prev_CLK_state, lock, direction, counter, button_pressed, prev_button_state
-
-    # Define the GPIO pins for the rotary encoder
-    CLK_PIN = 17  # GPIO7 connected to the rotary encoder's CLK pin
-    DT_PIN = 27   # GPIO8 connected to the rotary encoder's DT pin
-    SW_PIN = 22   # GPIO25 connected to the rotary encoder's SW pin
-
-    DIRECTION_CW = 0
-    DIRECTION_CCW = 1
-
-    counter = 0
-    direction = DIRECTION_CW
-    prev_CLK_state = GPIO.HIGH
-    button_pressed = False
-    prev_button_state = GPIO.HIGH
-
-    lock = threading.Lock()
-    
-    # Disable GPIO warnings
-    GPIO.setwarnings(False)
-
-    # Reset the GPIO pins
-    GPIO.cleanup()
-
-    # Set up the GPIO mode
-    GPIO.setmode(GPIO.BCM)
-
-    # Set up GPIO pins for rotary encoder
-    GPIO.setup(CLK_PIN, GPIO.IN)
-    GPIO.setup(DT_PIN, GPIO.IN)
-    GPIO.setup(SW_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-    # Read the initial state of the rotary encoder's CLK pin
-    prev_CLK_state = GPIO.input(CLK_PIN)
-
-def setup_matrix_keypad():
-    global row_pins, col_pins, rows, key_map, debounce_time
-    debounce_time = 0.05  # 50 ms debounce time
-
-    # Define the GPIO pins for rows and columns of the matrix keypad
-    row_pins = [12, 1]
-    col_pins = [13, 6, 5]
-
-    # Initialize buttons for rows with pull-down resistors
-    rows = [Button(pin, pull_up=False) for pin in row_pins]
-
-    # Set up columns as output and set them to high
-    for col in col_pins:
-        GPIO.setup(col, GPIO.OUT)
-        GPIO.output(col, GPIO.HIGH)
-
-    # Dictionary to hold the key mapping for matrix keypad
-    key_map = {
-        (1, 13): 1, (1, 6): 2, (1, 5): 3,
-        (12, 13): 4, (12, 6): 5, (12, 5): 6
-    }
-
-    # Attach the callback function to the button press event for each row
-    for row in rows:
-        row.when_pressed = lambda row=row: matrix_button_pressed(row)
-
-def matrix_button_pressed(row_pin):
-    global current_config_option, current_screen, current_menu_option
-
-    # Disable all column outputs
-    for col in col_pins:
-        GPIO.output(col, GPIO.LOW)
-
-    # Detect which button was pressed
-    for col in col_pins:
-        GPIO.output(col, GPIO.HIGH)
-        time.sleep(debounce_time)  # Debounce delay
-        if row_pin.is_pressed:
-            key = key_map.get((row_pin.pin.number, col), None)
-            if key:
-                print(f"Matrix Keypad:: Key pressed: {key}")
-                with lock:
-                    if current_screen == "menu":
-                        if menu_options[current_menu_option] == "GRABAR":
-                            if key == 1:
-                                track_initializer.init_master_track()
-                            else:
-                                track_initializer.init_track(key)
-                        elif menu_options[current_menu_option] == "CONFIG":
-                            if key == 1:
-                                current_screen = "config"
-                    elif current_screen == "config":
-                        if key == 1:
-                            if config_options[current_config_option] == "TOTAL BARS":
-                                current_screen = "menu"  # Return to menu after setting TOTAL BARS
-                            current_config_option = (current_config_option + 1) % len(config_options)
-                            print(f"Switched to: {config_options[current_config_option]}")
-                            loop_station.update_metronome()  # Update metronome with new config
-        GPIO.output(col, GPIO.LOW)
-
-    # Re-enable all column outputs
-    for col in col_pins:
-        GPIO.output(col, GPIO.HIGH)
-
 # Initialize I2C interface and OLED display
 serial = i2c(port=1, address=0x3C)
 device = sh1106(serial)
@@ -327,18 +230,7 @@ config_options = ["BPM", "TIME SIGNATURE", "TOTAL BARS"]
 time_signature_options = ["2/4", "3/4", "4/4"]
 current_config_option = 0
 
-# Set up the rotary encoder and matrix keypad
-setup_rotary_encoder()
-setup_matrix_keypad()
-
-# Current screen ("menu" or "config")
-current_screen = "menu"
-
-# Initialize the LoopStation and TrackInitializer
-server = s  # Replace with your server instance
-loop_station = LoopStation(server, config_option_values)
-track_initializer = TrackInitializer(loop_station)
-
+# Screen display functions
 def draw_countdown_screen(beat_count, beat_image):
     with lock:
         # Create a new image for the countdown screen
@@ -455,6 +347,7 @@ def draw_config_screen():
         # Display the rotated image on the device
         device.display(rotated_image)
 
+# Rotary encoder handling
 def handle_rotary_encoder():
     global counter, direction, prev_CLK_state, current_config_option, current_menu_option, current_screen
     while True:
@@ -515,13 +408,138 @@ def handle_rotary_encoder():
 
         time.sleep(0.001)  # Small delay to prevent CPU overuse
 
+# Matrix keypad handling
+def setup_rotary_encoder():
+    global CLK_PIN, DT_PIN, SW_PIN, DIRECTION_CW, DIRECTION_CCW, prev_CLK_state, lock, direction, counter, button_pressed, prev_button_state
+
+    # Define the GPIO pins for the rotary encoder
+    CLK_PIN = 17  # GPIO7 connected to the rotary encoder's CLK pin
+    DT_PIN = 27   # GPIO8 connected to the rotary encoder's DT pin
+    SW_PIN = 22   # GPIO25 connected to the rotary encoder's SW pin
+
+    DIRECTION_CW = 0
+    DIRECTION_CCW = 1
+
+    counter = 0
+    direction = DIRECTION_CW
+    prev_CLK_state = GPIO.HIGH
+    button_pressed = False
+    prev_button_state = GPIO.HIGH
+
+    lock = threading.Lock()
+    
+    # Disable GPIO warnings
+    GPIO.setwarnings(False)
+
+    # Reset the GPIO pins
+    GPIO.cleanup()
+
+    # Set up the GPIO mode
+    GPIO.setmode(GPIO.BCM)
+
+    # Set up GPIO pins for rotary encoder
+    GPIO.setup(CLK_PIN, GPIO.IN)
+    GPIO.setup(DT_PIN, GPIO.IN)
+    GPIO.setup(SW_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+    # Read the initial state of the rotary encoder's CLK pin
+    prev_CLK_state = GPIO.input(CLK_PIN)
+
+def setup_matrix_keypad():
+    global row_pins, col_pins, rows, key_map, debounce_time
+    debounce_time = 0.05  # 50 ms debounce time
+
+    # Define the GPIO pins for rows and columns of the matrix keypad
+    row_pins = [12, 1]
+    col_pins = [13, 6, 5]
+
+    # Initialize buttons for rows with pull-down resistors
+    rows = [Button(pin, pull_up=False) for pin in row_pins]
+
+    # Set up columns as output and set them to high
+    for col in col_pins:
+        GPIO.setup(col, GPIO.OUT)
+        GPIO.output(col, GPIO.HIGH)
+
+    # Dictionary to hold the key mapping for matrix keypad
+    key_map = {
+        (1, 13): 1, (1, 6): 2, (1, 5): 3,
+        (12, 13): 4, (12, 6): 5, (12, 5): 6
+    }
+
+    # Attach the callback function to the button press event for each row
+    for row in rows:
+        row.when_pressed = lambda row=row: matrix_button_pressed(row)
+
+def matrix_button_pressed(row_pin):
+    global current_config_option, current_screen, current_menu_option
+
+    # Disable all column outputs
+    for col in col_pins:
+        GPIO.output(col, GPIO.LOW)
+
+    # Detect which button was pressed
+    for col in col_pins:
+        GPIO.output(col, GPIO.HIGH)
+        time.sleep(debounce_time)  # Debounce delay
+        if row_pin.is_pressed:
+            key = key_map.get((row_pin.pin.number, col), None)
+            if key:
+                print(f"Matrix Keypad:: Key pressed: {key}")
+                with lock:
+                    if current_screen == "menu":
+                        if menu_options[current_menu_option] == "GRABAR":
+                            if key == 1:
+                                track_initializer.init_master_track()
+                            else:
+                                track_initializer.init_track(key)
+                        elif menu_options[current_menu_option] == "CONFIG":
+                            if key == 1:
+                                current_screen = "config"
+                    elif current_screen == "config":
+                        if key == 1:
+                            if config_options[current_config_option] == "TOTAL BARS":
+                                current_screen = "menu"  # Return to menu after setting TOTAL BARS
+                            current_config_option = (current_config_option + 1) % len(config_options)
+                            print(f"Switched to: {config_options[current_config_option]}")
+                            loop_station.update_metronome()  # Update metronome with new config
+        GPIO.output(col, GPIO.LOW)
+
+    # Re-enable all column outputs
+    for col in col_pins:
+        GPIO.output(col, GPIO.HIGH)
+
+# Update screen thread
 def update_screen():
     while True:
         if current_screen == "menu":
             draw_menu()
         elif current_screen == "config":
             draw_config_screen()
-        time.sleep(0.05)  # Update the screen every 0.05 seconds
+        time.sleep(0.1)  # Update the screen every 0.1 seconds
+
+# Countdown screen thread
+def countdown_screen_thread():
+    while True:
+        if current_screen == "countdown":
+            beat_count = int(loop_station.metronome.countdown_counter.get())
+            if beat_count <= loop_station.metronome.beats_per_bar:
+                image_index = beat_count - 1
+                beat_image = beat_images_loaded[loop_station.metronome.time_signature][image_index]
+                draw_countdown_screen(beat_count, beat_image)
+        time.sleep(0.1)
+
+# Set up the rotary encoder and matrix keypad
+setup_rotary_encoder()
+setup_matrix_keypad()
+
+# Current screen ("menu" or "config" or "countdown")
+current_screen = "menu"
+
+# Initialize the LoopStation and TrackInitializer
+server = s  # Replace with your server instance
+loop_station = LoopStation(server, config_option_values)
+track_initializer = TrackInitializer(loop_station)
 
 try:
     print(f"Listening for rotary encoder changes and button presses...")
@@ -529,6 +547,7 @@ try:
     # Start threads for handling the rotary encoder, button press, and screen update
     threading.Thread(target=handle_rotary_encoder, daemon=True).start()
     threading.Thread(target=update_screen, daemon=True).start()
+    threading.Thread(target=countdown_screen_thread, daemon=True).start()
 
     # Keep the main thread running
     while True:
