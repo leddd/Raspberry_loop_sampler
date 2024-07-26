@@ -6,43 +6,6 @@ from PIL import Image, ImageDraw, ImageFont
 from luma.core.interface.serial import i2c
 from luma.oled.device import sh1106
 
-# Initialize I2C interface and OLED display
-serial = i2c(port=1, address=0x3C)
-device = sh1106(serial)
-
-# Path to your TTF font file
-font_path = 'fonts/InputSansNarrow-Thin.ttf'
-
-# Menu options
-menu_options = ["GRABAR", "CONFIG"]
-current_option = 0
-
-# CONFIG options
-config_options = ["BPM", "TIME SIGNATURE", "TOTAL BARS"]
-config_option_values = {
-    "BPM": 120,
-    "TIME SIGNATURE": "4/4",
-    "TOTAL BARS": 4
-}
-time_signature_options = ["2/4", "3/4", "4/4"]
-current_config_option = 0
-
-# Current settings
-bpm = 120
-time_signature = "4/4"
-total_bars = 4
-
-# Padding and margin variables
-top_margin = 6
-bottom_margin = 8
-menu_padding = 8
-settings_padding = 4
-highlight_offset = 2  # Offset of the highlight position
-
-# Load a custom font
-font_size = 12  # You can adjust the font size as needed
-font = ImageFont.truetype(font_path, font_size)
-
 def setup_rotary_encoder():
     global CLK_PIN, DT_PIN, SW_PIN, DIRECTION_CW, DIRECTION_CCW, prev_CLK_state, lock, direction, counter, button_pressed, prev_button_state
 
@@ -106,7 +69,7 @@ def setup_matrix_keypad():
         row.when_pressed = lambda row=row: matrix_button_pressed(row)
 
 def matrix_button_pressed(row_pin):
-    global current_option
+    global current_config_option, current_screen, current_menu_option
 
     # Disable all column outputs
     for col in col_pins:
@@ -120,61 +83,85 @@ def matrix_button_pressed(row_pin):
             key = key_map.get((row_pin.pin.number, col), None)
             if key:
                 print(f"Matrix Keypad:: Key pressed: {key}")
-                if key == 1:  # Placeholder action for key 1
-                    print("Key 1 pressed, performing action...")
-                    # Add action for key 1 here
+                if key == 1:  # Advance configuration option when key 1 is pressed
+                    with lock:
+                        if current_screen == "menu":
+                            current_menu_option = (current_menu_option + 1) % len(menu_options)
+                        elif current_screen == "config":
+                            current_config_option = (current_config_option + 1) % len(config_options)
+                            print(f"Switched to: {config_options[current_config_option]}")
         GPIO.output(col, GPIO.LOW)
 
     # Re-enable all column outputs
     for col in col_pins:
         GPIO.output(col, GPIO.HIGH)
 
-def draw_menu(current_option):
-    global bpm, time_signature, total_bars
-    # Create an image in portrait mode dimensions
-    image = Image.new('1', (64, 128), "black")
-    draw = ImageDraw.Draw(image)
-    
-    # Draw menu options
-    y_offset = top_margin
-    for i, option in enumerate(menu_options):
-        bbox = draw.textbbox((0, 0), option, font=font)  # Get bounding box
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        text_x = (64 - text_width) // 2
-        text_y = y_offset
-        if i == current_option:
-            # Draw highlight
-            highlight_rect = [
-                0,  # Start at the left edge of the screen
-                text_y - menu_padding + highlight_offset,  # Adjust to position the highlight a bit lower
-                64,  # End at the right edge of the screen
-                text_y + text_height + menu_padding + highlight_offset
-            ]
-            draw.rectangle(highlight_rect, outline="white", fill="white")
-            draw.text((text_x, text_y), option, font=font, fill="black")  # Draw text in black
-        else:
-            draw.text((text_x, text_y), option, font=font, fill="white")  # Draw text in white
-        y_offset += text_height + menu_padding * 2
+# Initialize I2C interface and OLED display
+serial = i2c(port=1, address=0x3C)
+device = sh1106(serial)
 
-    # Draw current settings
-    settings = [f"{bpm}BPM", time_signature, f"{total_bars}BARS"]
-    settings_start_y = 128 - bottom_margin - (len(settings) * (text_height + settings_padding * 2))
-    y_offset = max(y_offset, settings_start_y)
-    for setting in settings:
-        bbox = draw.textbbox((0, 0), setting, font=font)  # Get bounding box
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        text_x = (64 - text_width) // 2
-        text_y = y_offset
-        draw.text((text_x, text_y), setting, font=font, fill="white")  # Draw text in white
-        y_offset += text_height + settings_padding * 2
+# Path to your TTF font file
+font_path = 'fonts/InputSansNarrow-Thin.ttf'
 
-    # Rotate the image by 90 degrees to fit the landscape display
-    rotated_image = image.rotate(270, expand=True)
-    
-    # Display the rotated image on the device
-    device.display(rotated_image)
+# Menu options
+menu_options = ["GRABAR", "CONFIG"]
+current_menu_option = 0
+
+# CONFIG options
+config_options = ["BPM", "TIME SIGNATURE", "TOTAL BARS"]
+config_option_values = {
+    "BPM": 120,
+    "TIME SIGNATURE": "4/4",
+    "TOTAL BARS": 4
+}
+time_signature_options = ["2/4", "3/4", "4/4"]
+current_config_option = 0
+
+# Set up the rotary encoder and matrix keypad
+setup_rotary_encoder()
+setup_matrix_keypad()
+
+# Current screen ("menu" or "config")
+current_screen = "menu"
+
+def draw_menu():
+    global current_menu_option
+    with lock:
+        # Create an image in portrait mode dimensions
+        image = Image.new('1', (64, 128), "black")
+        draw = ImageDraw.Draw(image)
+        
+        # Load a custom font
+        font_size = 12  # Adjust the font size as needed
+        font = ImageFont.truetype(font_path, font_size)
+
+        # Draw menu options
+        y_offset = 0  # Adjust as needed
+        for i, option in enumerate(menu_options):
+            bbox = draw.textbbox((0, 0), option, font=font)  # Get bounding box
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+            text_x = (64 - text_width) // 2
+            text_y = y_offset
+            if i == current_menu_option:
+                # Draw highlight
+                highlight_rect = [
+                    0,  # Start at the left edge of the screen
+                    text_y - 2,  # Adjust to position the highlight a bit lower
+                    64,  # End at the right edge of the screen
+                    text_y + text_height + 2
+                ]
+                draw.rectangle(highlight_rect, outline="white", fill="white")
+                draw.text((text_x, text_y), option, font=font, fill="black")  # Draw text in black
+            else:
+                draw.text((text_x, text_y), option, font=font, fill="white")  # Draw text in white
+            y_offset += text_height + 4  # Adjust spacing as needed
+
+        # Rotate the image by 90 degrees to fit the landscape display
+        rotated_image = image.rotate(270, expand=True)
+        
+        # Display the rotated image on the device
+        device.display(rotated_image)
 
 def draw_config_screen():
     global current_config_option
@@ -213,7 +200,7 @@ def draw_config_screen():
         device.display(rotated_image)
 
 def handle_rotary_encoder():
-    global counter, direction, prev_CLK_state, current_config_option
+    global counter, direction, prev_CLK_state, current_config_option, current_menu_option, current_screen
     while True:
         # Read the current state of the rotary encoder's CLK and DT pins
         CLK_state = GPIO.input(CLK_PIN)
@@ -230,7 +217,13 @@ def handle_rotary_encoder():
             counter += 1
             if counter % 2 == 0:  # Only update on every second step
                 with lock:
-                    if menu_options[current_option] == "CONFIG":
+                    if current_screen == "menu":
+                        if direction == DIRECTION_CW:
+                            current_menu_option = (current_menu_option + 1) % len(menu_options)
+                        else:
+                            current_menu_option = (current_menu_option - 1) % len(menu_options)
+                        print(f"Menu Option: {menu_options[current_menu_option]}")
+                    elif current_screen == "config":
                         option = config_options[current_config_option]
                         if option == "BPM":
                             if direction == DIRECTION_CW:
@@ -259,13 +252,6 @@ def handle_rotary_encoder():
                                     config_option_values[option] = 1
 
                         print(f"{option}: {config_option_values[option]}")
-                    else:
-                        if direction == DIRECTION_CW:
-                            current_option = (current_option + 1) % len(menu_options)
-                        else:
-                            current_option = (current_option - 1) % len(menu_options)
-
-                        print(f"Current menu option: {menu_options[current_option]}")
 
         # Save last CLK state
         prev_CLK_state = CLK_state
@@ -274,18 +260,14 @@ def handle_rotary_encoder():
 
 def update_screen():
     while True:
-        if menu_options[current_option] == "CONFIG":
+        if current_screen == "menu":
+            draw_menu()
+        elif current_screen == "config":
             draw_config_screen()
-        else:
-            draw_menu(current_option)
         time.sleep(0.1)  # Update the screen every 0.1 seconds
 
 try:
     print(f"Listening for rotary encoder changes and button presses...")
-
-    # Set up the rotary encoder and matrix keypad
-    setup_rotary_encoder()
-    setup_matrix_keypad()
 
     # Start threads for handling the rotary encoder, button press, and screen update
     threading.Thread(target=handle_rotary_encoder, daemon=True).start()
