@@ -158,6 +158,19 @@ def draw_menu():
                 draw.text((text_x, text_y), option, font=font, fill="white")  # Draw text in white
             y_offset += text_height + 4  # Adjust spacing as needed
 
+        # Draw current settings
+        settings = [f"{config_option_values['BPM']} BPM", config_option_values["TIME SIGNATURE"], f"{config_option_values['TOTAL BARS']} BARS"]
+        settings_start_y = 128 - (len(settings) * (text_height + 4))  # Adjust the bottom margin if necessary
+        y_offset = max(y_offset, settings_start_y)
+        for setting in settings:
+            bbox = draw.textbbox((0, 0), setting, font=font)  # Get bounding box
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+            text_x = (64 - text_width) // 2
+            text_y = y_offset
+            draw.text((text_x, text_y), setting, font=font, fill="white")  # Draw text in white
+            y_offset += text_height + 4  # Adjust spacing as needed
+
         # Rotate the image by 90 degrees to fit the landscape display
         rotated_image = image.rotate(270, expand=True)
         
