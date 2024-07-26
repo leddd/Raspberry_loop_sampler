@@ -91,6 +91,8 @@ def matrix_button_pressed(row_pin):
                         if key == 1:
                             current_config_option = (current_config_option + 1) % len(config_options)
                             print(f"Switched to: {config_options[current_config_option]}")
+                            if config_options[current_config_option] == "TOTAL BARS":
+                                current_screen = "menu"  # Return to menu after setting TOTAL BARS
         GPIO.output(col, GPIO.LOW)
 
     # Re-enable all column outputs
@@ -264,6 +266,8 @@ def handle_rotary_encoder():
                                 config_option_values[option] -= 1
                                 if config_option_values[option] < 1:
                                     config_option_values[option] = 1
+                            if config_options[current_config_option] == "TOTAL BARS":
+                                current_screen = "menu"  # Return to menu after setting TOTAL BARS
 
                         print(f"{option}: {config_option_values[option]}")
 
