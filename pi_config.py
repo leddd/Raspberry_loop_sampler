@@ -6,6 +6,42 @@ from PIL import Image, ImageDraw, ImageFont
 from luma.core.interface.serial import i2c, spi
 from luma.oled.device import sh1106
 
+def setup_rotary_encoder():
+    global CLK_PIN, DT_PIN, SW_PIN, DIRECTION_CW, DIRECTION_CCW, prev_CLK_state, lock, direction, counter, button_pressed, prev_button_state
+
+    # Define the GPIO pins for the rotary encoder
+    CLK_PIN = 17  # GPIO7 connected to the rotary encoder's CLK pin
+    DT_PIN = 27   # GPIO8 connected to the rotary encoder's DT pin
+    SW_PIN = 22   # GPIO25 connected to the rotary encoder's SW pin
+
+    DIRECTION_CW = 0
+    DIRECTION_CCW = 1
+
+    counter = 0
+    direction = DIRECTION_CW
+    prev_CLK_state = GPIO.HIGH
+    button_pressed = False
+    prev_button_state = GPIO.HIGH
+
+    lock = threading.Lock()
+    
+    # Disable GPIO warnings
+    GPIO.setwarnings(False)
+
+    # Reset the GPIO pins
+    GPIO.cleanup()
+
+    # Set up the GPIO mode
+    GPIO.setmode(GPIO.BCM)
+
+    # Set up GPIO pins for rotary encoder
+    GPIO.setup(CLK_PIN, GPIO.IN)
+    GPIO.setup(DT_PIN, GPIO.IN)
+    GPIO.setup(SW_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+    # Read the initial state of the rotary encoder's CLK pin
+    prev_CLK_state = GPIO.input(CLK_PIN)
+
 # Initialize I2C interface and OLED display
 serial = i2c(port=1, address=0x3C)
 device = sh1106(serial)
@@ -23,40 +59,8 @@ config_option_values = {
 time_signature_options = ["2/4", "3/4", "4/4"]
 current_config_option = 0
 
-# Define the GPIO pins for the rotary encoder
-CLK_PIN = 17  # GPIO7 connected to the rotary encoder's CLK pin
-DT_PIN = 27   # GPIO8 connected to the rotary encoder's DT pin
-SW_PIN = 22   # GPIO25 connected to the rotary encoder's SW pin
-
-DIRECTION_CW = 0
-DIRECTION_CCW = 1
-
-counter = 0
-direction = DIRECTION_CW
-prev_CLK_state = GPIO.HIGH
-
-button_pressed = False
-prev_button_state = GPIO.HIGH
-
-# Lock for synchronizing access to shared resources
-lock = threading.Lock()
-
-# Disable GPIO warnings
-GPIO.setwarnings(False)
-
-# Reset the GPIO pins
-GPIO.cleanup()
-
-# Set up the GPIO mode
-GPIO.setmode(GPIO.BCM)
-
-# Set up GPIO pins for rotary encoder
-GPIO.setup(CLK_PIN, GPIO.IN)
-GPIO.setup(DT_PIN, GPIO.IN)
-GPIO.setup(SW_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-# Read the initial state of the rotary encoder's CLK pin
-prev_CLK_state = GPIO.input(CLK_PIN)
+# Set up the rotary encoder
+setup_rotary_encoder()
 
 def draw_config_screen():
     global current_config_option
