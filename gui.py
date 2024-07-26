@@ -83,11 +83,12 @@ def matrix_button_pressed(row_pin):
             key = key_map.get((row_pin.pin.number, col), None)
             if key:
                 print(f"Matrix Keypad:: Key pressed: {key}")
-                if key == 1:  # Advance configuration option when key 1 is pressed
-                    with lock:
-                        if current_screen == "menu":
-                            current_menu_option = (current_menu_option + 1) % len(menu_options)
-                        elif current_screen == "config":
+                with lock:
+                    if current_screen == "menu":
+                        if key == 1 and menu_options[current_menu_option] == "CONFIG":
+                            current_screen = "config"
+                    elif current_screen == "config":
+                        if key == 1:
                             current_config_option = (current_config_option + 1) % len(config_options)
                             print(f"Switched to: {config_options[current_config_option]}")
         GPIO.output(col, GPIO.LOW)
