@@ -83,94 +83,56 @@ CLK_PIN = 17  # GPIO7 connected to the rotary encoder's CLK pin
 DT_PIN = 27   # GPIO8 connected to the rotary encoder's DT pin
 SW_PIN = 22   # GPIO25 connected to the rotary encoder's SW pin
 
-DIRECTION_CW = 0
-DIRECTION_CCW = 1
-
-counter = 0
-direction = DIRECTION_CW
-CLK_state = 0
-prev_CLK_state = 0
-
-button_pressed = False
-prev_button_state = GPIO.HIGH
-
 # Disable GPIO warnings
 GPIO.setwarnings(False)
-
-# Reset the GPIO pins
-GPIO.cleanup()
 
 # Set up the GPIO mode
 GPIO.setmode(GPIO.BCM)
 
 # Set up GPIO pins for rotary encoder
-GPIO.setup(CLK_PIN, GPIO.IN)
-GPIO.setup(DT_PIN, GPIO.IN)
+GPIO.setup(CLK_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(DT_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(SW_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-# Read the initial state of the rotary encoder's CLK pin
-prev_CLK_state = GPIO.input(CLK_PIN)
-prev_DT_state = GPIO.input(DT_PIN)
+# Initial state
+last_state = GPIO.input(CLK_PIN)
+current_option = 0
 
-# Function to handle rotary encoder
-def handle_rotary_encoder():
-    global counter, direction, prev_CLK_state, prev_DT_state, current_option
+# Interrupt handlers for rotary encoder
+def rotary_callback(channel):
+    global last_state, current_option
+    clk_state = GPIO.input(CLK_PIN)
+    dt_state = GPIO.input(DT_PIN)
 
-    # Read the current state of the rotary encoder's CLK and DT pins
-    CLK_state = GPIO.input(CLK_PIN)
-    DT_state = GPIO.input(DT_PIN)
-
-    # If the state of CLK is changed, then pulse occurred
-    if CLK_state != prev_CLK_state:
-        # Determine the direction
-        if DT_state != CLK_state:
-            counter += 1
-            direction = DIRECTION_CW
+    if clk_state != last_state:
+        if dt_state != clk_state:
             current_option = (current_option + 1) % len(menu_options)
         else:
-            counter -= 1
-            direction = DIRECTION_CCW
             current_option = (current_option - 1) % len(menu_options)
 
-        print("Rotary Encoder:: direction:", "CLOCKWISE" if direction == DIRECTION_CW else "ANTICLOCKWISE",
-              "- count:", counter)
-
-        # Redraw the menu with the updated current_option
         draw_menu(current_option)
 
-    # Save last CLK and DT state
-    prev_CLK_state = CLK_state
-    prev_DT_state = DT_state
+    last_state = clk_state
 
-# Function to handle button press on rotary encoder
-def handle_encoder_button():
-    global button_pressed, prev_button_state
+def button_callback(channel):
+    global current_option
+    if GPIO.input(SW_PIN) == GPIO.LOW:
+        # Trigger the action for the current menu option
+        if current_option == 0:
+            print("Action: GRABAR")
+            # Add action for GRABAR
+        elif current_option == 1:
+            print("Action: CONFIG")
+            # Add action for CONFIG
 
-    # State change detection for the button
-    button_state = GPIO.input(SW_PIN)
-    if button_state != prev_button_state:
-        time.sleep(0.01)  # Add a small delay to debounce
-        if button_state == GPIO.LOW:
-            print("Rotary Encoder Button:: The button is pressed")
-            button_pressed = True
-            # Trigger the action for the current menu option
-            if current_option == 0:
-                print("Action: GRABAR")
-                # Add action for GRABAR
-            elif current_option == 1:
-                print("Action: CONFIG")
-                # Add action for CONFIG
-        else:
-            button_pressed = False
-
-    prev_button_state = button_state
+# Set up event detection for rotary encoder
+GPIO.add_event_detect(CLK_PIN, GPIO.BOTH, callback=rotary_callback, bouncetime=1)
+GPIO.add_event_detect(SW_PIN, GPIO.FALLING, callback=button_callback, bouncetime=200)
 
 try:
-    print(f"Listening for rotary encoder changes and button presses...")
+    print("Listening for rotary encoder changes and button presses...")
     draw_menu(current_option)  # Draw the initial menu
     while True:
-        handle_rotary_encoder()
-        handle_encoder_button()
-        time.sleep(0.001)  # Small delay to prevent CPU overuse
+        time.sleep(0.1)  # Main loop can be slow since we're using interrupts
 except KeyboardInterrupt:
     GPIO.cleanup()  # Clean up GPIO on program exit
