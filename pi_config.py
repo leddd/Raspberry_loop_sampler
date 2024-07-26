@@ -3,7 +3,7 @@ import threading
 import RPi.GPIO as GPIO
 from gpiozero import Button
 from PIL import Image, ImageDraw, ImageFont
-from luma.core.interface.serial import i2c, spi
+from luma.core.interface.serial import i2c
 from luma.oled.device import sh1106
 
 def setup_rotary_encoder():
