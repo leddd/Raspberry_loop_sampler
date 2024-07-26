@@ -128,8 +128,6 @@ def handle_rotary_encoder():
                 if config_option_values[option] < 1:
                     config_option_values[option] = 1
 
-        draw_config_screen()
-
     # Save last CLK state
     prev_CLK_state = CLK_state
 
@@ -146,7 +144,6 @@ def handle_encoder_button():
             button_pressed = True
             # Move to the next configuration option
             current_config_option = (current_config_option + 1) % len(config_options)
-            draw_config_screen()
         else:
             button_pressed = False
 
@@ -158,6 +155,7 @@ try:
     while True:
         handle_rotary_encoder()
         handle_encoder_button()
-        time.sleep(0.001)  # Small delay to prevent CPU overuse
+        draw_config_screen()  # Refresh the screen at a fixed rate
+        time.sleep(0.1)  # Adjust delay as needed
 except KeyboardInterrupt:
     GPIO.cleanup()  # Clean up GPIO on program exit
