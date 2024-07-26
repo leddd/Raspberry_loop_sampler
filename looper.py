@@ -24,12 +24,11 @@ latency = 0.115  # Latency in seconds
 
 # Dictionary to store image paths for each time signature
 beat_images = {
-    "2/4": ['djavu/screens/2-4_1.png', 'djavu/screens/2-4_2.png'],
-    "3/4": ['djavu/screens/3-4_1.png', 'djavu/screens/3-4_2.png', 'djavu/screens/3-4_3.png'],
-    "4/4": ['djavu/screens/4-4_1.png', 'djavu/screens/4-4_2.png', 'djavu/screens/4-4_3.png', 'djavu/screens/4-4_4.png'],
-    "6/8": ['djavu/screens/6-8_1.png', 'djavu/screens/6-8_2.png', 'djavu/screens/6-8_3.png', 'djavu/screens/6-8_4.png', 'djavu/screens/6-8_5.png', 'djavu/screens/6-8_6.png']
+    "2/4": ['/home/vice/main/djavu/screens/2-4_1.png', '/home/vice/main/djavu/screens/2-4_2.png'],
+    "3/4": ['/home/vice/main/djavu/screens/3-4_1.png', '/home/vice/main/djavu/screens/3-4_2.png', '/home/vice/main/djavu/screens/3-4_3.png'],
+    "4/4": ['/home/vice/main/djavu/screens/4-4_1.png', '/home/vice/main/djavu/screens/4-4_2.png', '/home/vice/main/djavu/screens/4-4_3.png', '/home/vice/main/djavu/screens/4-4_4.png'],
+    "6/8": ['/home/vice/main/djavu/screens/6-8_1.png', '/home/vice/main/djavu/screens/6-8_2.png', '/home/vice/main/djavu/screens/6-8_3.png', '/home/vice/main/djavu/screens/6-8_4.png', '/home/vice/main/djavu/screens/6-8_5.png', '/home/vice/main/djavu/screens/6-8_6.png']
 }
-
 # Load the beat images
 beat_images_loaded = {}
 for key, paths in beat_images.items():
@@ -206,7 +205,7 @@ serial = i2c(port=1, address=0x3C)
 device = sh1106(serial)
 
 # Path to your TTF font file
-font_path = 'djavu/fonts/InputSansNarrow-Thin.ttf'
+font_path = '/home/vice/main/djavu/fonts/InputSansNarrow-Thin.ttf'
 
 # Menu options
 menu_options = ["GRABAR", "CONFIG"]
