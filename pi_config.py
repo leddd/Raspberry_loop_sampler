@@ -3,7 +3,6 @@ import RPi.GPIO as GPIO
 from gpiozero import Button
 from PIL import Image, ImageDraw, ImageFont
 from luma.core.interface.serial import i2c, spi
-from luma.core.render import canvas
 from luma.oled.device import sh1106
 
 # Initialize I2C interface and OLED display
@@ -135,7 +134,6 @@ def handle_rotary_encoder():
                         config_option_values[option] = 1
 
             print(f"{option}: {config_option_values[option]}")
-            draw_config_screen()  # Update the screen with the new value
 
     # Save last CLK state
     prev_CLK_state = CLK_state
@@ -154,7 +152,6 @@ def handle_encoder_button():
             # Move to the next configuration option
             current_config_option = (current_config_option + 1) % len(config_options)
             print(f"Switched to: {config_options[current_config_option]}")
-            draw_config_screen()  # Update the screen with the new option
         else:
             button_pressed = False
 
@@ -162,10 +159,17 @@ def handle_encoder_button():
 
 try:
     print(f"Listening for rotary encoder changes and button presses...")
+    last_draw_time = time.time()
     draw_config_screen()  # Draw the initial config screen
     while True:
         handle_rotary_encoder()
         handle_encoder_button()
+
+        # Refresh the display every 0.1 seconds
+        if time.time() - last_draw_time >= 0.1:
+            draw_config_screen()
+            last_draw_time = time.time()
+
         time.sleep(0.001)  # Small delay to prevent CPU overuse
 except KeyboardInterrupt:
     GPIO.cleanup()  # Clean up GPIO on program exit
