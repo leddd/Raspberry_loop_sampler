@@ -131,7 +131,7 @@ class Track:
             beat_count = int(self.metronome.countdown_counter.get())
             image_index = beat_count - 1
             beat_image = beat_images_loaded[self.metronome.time_signature][image_index]
-            display_countdown_screen(beat_count, beat_image)
+            draw_countdown_screen(beat_count, beat_image)
     
     def print_beat(self):
         print("Current beat:", self.metronome.current_beat.get())
