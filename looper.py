@@ -123,11 +123,13 @@ class Track:
         print("Stopped Playback.")
         
     def print_countdown(self):
+        global current_screen, current_beat
         if self.metronome.countdown_counter.get() <= self.metronome.beats_per_bar:
-            print("Countdown counter:", self.metronome.countdown_counter.get())
             beat_count = int(self.metronome.countdown_counter.get())
-            image_index = beat_count - 1
-            beat_image = beat_images_loaded[self.metronome.time_signature][image_index]
+            current_beat = beat_count
+            current_screen = "countdown"
+            print("Countdown counter:", beat_count)
+            beat_image = beat_images_loaded[self.metronome.time_signature][beat_count - 1]
             draw_countdown_screen(beat_count, beat_image)
     
     def print_beat(self):
@@ -292,8 +294,10 @@ def matrix_button_pressed(row_pin):
                         if menu_options[current_menu_option] == "GRABAR":
                             if key == 1:
                                 track_initializer.init_master_track()
+                                current_screen = "status"  # Switch to status screen
                             else:
                                 track_initializer.init_track(key)
+                                current_screen = "status"  # Switch to status screen
                         elif menu_options[current_menu_option] == "CONFIG":
                             if key == 1:
                                 current_screen = "config"
@@ -365,6 +369,7 @@ def draw_countdown_screen(beat_count, beat_image):
 
         # Display the rotated image on the device
         device.display(rotated_image)
+
 
 def draw_menu():
     global current_menu_option
@@ -515,12 +520,19 @@ def handle_rotary_encoder():
         time.sleep(0.001)  # Small delay to prevent CPU overuse
 
 def update_screen():
+    global current_screen
     while True:
-        if current_screen == "menu":
-            draw_menu()
-        elif current_screen == "config":
-            draw_config_screen()
-        time.sleep(0.1)  # Update the screen every 0.1 seconds
+        with lock:
+            if current_screen == "menu":
+                draw_menu()
+            elif current_screen == "config":
+                draw_config_screen()
+            elif current_screen == "countdown":
+                draw_countdown_screen(current_beat, beat_images_loaded[time_signature][current_beat - 1])
+            elif current_screen == "status":
+                draw_status_screen()
+        time.sleep(0.01)  # Small delay to prevent CPU overuse
+
 
 try:
     print(f"Listening for rotary encoder changes and button presses...")
