@@ -29,6 +29,7 @@ beat_images = {
     "4/4": ['/home/vice/main/djavu/screens/4-4_1.png', '/home/vice/main/djavu/screens/4-4_2.png', '/home/vice/main/djavu/screens/4-4_3.png', '/home/vice/main/djavu/screens/4-4_4.png'],
     "6/8": ['/home/vice/main/djavu/screens/6-8_1.png', '/home/vice/main/djavu/screens/6-8_2.png', '/home/vice/main/djavu/screens/6-8_3.png', '/home/vice/main/djavu/screens/6-8_4.png', '/home/vice/main/djavu/screens/6-8_5.png', '/home/vice/main/djavu/screens/6-8_6.png']
 }
+
 # Load the beat images
 beat_images_loaded = {}
 for key, paths in beat_images.items():
@@ -515,6 +516,13 @@ def update_screen():
             draw_config_screen()
         time.sleep(0.1)  # Update the screen every 0.1 seconds
 
+# Keep the display active
+def keep_display_active():
+    while True:
+        with lock:
+            device.show()  # Send a command to keep the display active
+        time.sleep(5)  # Adjust the interval as needed
+
 # Set up the rotary encoder and matrix keypad
 setup_rotary_encoder()
 setup_matrix_keypad()
@@ -530,10 +538,11 @@ track_initializer = TrackInitializer(loop_station)
 try:
     print(f"Listening for rotary encoder changes and button presses...")
 
-    # Start threads for handling the rotary encoder, button press, and screen update
+    # Start threads for handling the rotary encoder, button press, screen update, and keeping the display active
     threading.Thread(target=handle_rotary_encoder, daemon=True).start()
     threading.Thread(target=update_screen, daemon=True).start()
     threading.Thread(target=countdown_screen_thread, daemon=True).start()
+    threading.Thread(target=keep_display_active, daemon=True).start()
 
     # Keep the main thread running
     while True:
