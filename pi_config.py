@@ -44,7 +44,7 @@ def setup_rotary_encoder():
 
 def setup_matrix_keypad():
     global row_pins, col_pins, rows, key_map, debounce_time
-    debounce_time = 0.1  # 100 ms debounce time
+    debounce_time = 0.05  # 50 ms debounce time
 
     # Define the GPIO pins for rows and columns of the matrix keypad
     row_pins = [12, 1]
