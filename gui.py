@@ -101,10 +101,32 @@ def handle_rotary_encoder():
             counter -= 1
             direction = 1  # CCW
 
-        if direction == 0:
-            current_config_option = (current_config_option + 1) % len(config_options)
-        else:
-            current_config_option = (current_config_option - 1) % len(config_options)
+        option = config_options[current_config_option]
+        if option == "BPM":
+            if direction == 0:
+                config_option_values[option] += 1
+                if config_option_values[option] > 200:
+                    config_option_values[option] = 200
+            else:
+                config_option_values[option] -= 1
+                if config_option_values[option] < 40:
+                    config_option_values[option] = 40
+        elif option == "TIME SIGNATURE":
+            index = time_signature_options.index(config_option_values[option])
+            if direction == 0:
+                index = (index + 1) % len(time_signature_options)
+            else:
+                index = (index - 1) % len(time_signature_options)
+            config_option_values[option] = time_signature_options[index]
+        elif option == "TOTAL BARS":
+            if direction == 0:
+                config_option_values[option] += 1
+                if config_option_values[option] > 16:
+                    config_option_values[option] = 16
+            else:
+                config_option_values[option] -= 1
+                if config_option_values[option] < 1:
+                    config_option_values[option] = 1
 
         draw_config_screen()
 
@@ -113,7 +135,7 @@ def handle_rotary_encoder():
 
 # Function to handle button press on rotary encoder
 def handle_encoder_button():
-    global button_pressed, prev_button_state
+    global button_pressed, prev_button_state, current_config_option
 
     # State change detection for the button
     button_state = GPIO.input(SW_PIN)
@@ -122,21 +144,8 @@ def handle_encoder_button():
         if button_state == GPIO.LOW:
             print("Rotary Encoder Button:: The button is pressed")
             button_pressed = True
-            # Toggle through the values for the current configuration option
-            option = config_options[current_config_option]
-            if option == "BPM":
-                config_option_values[option] += 1
-                if config_option_values[option] > 200:
-                    config_option_values[option] = 60
-            elif option == "TIME SIGNATURE":
-                index = time_signature_options.index(config_option_values[option])
-                index = (index + 1) % len(time_signature_options)
-                config_option_values[option] = time_signature_options[index]
-            elif option == "TOTAL BARS":
-                config_option_values[option] += 1
-                if config_option_values[option] > 16:
-                    config_option_values[option] = 1
-
+            # Move to the next configuration option
+            current_config_option = (current_config_option + 1) % len(config_options)
             draw_config_screen()
         else:
             button_pressed = False
