@@ -22,7 +22,18 @@ config_option_values = {
 }
 latency = 0.115  # Latency in seconds
 
+# Dictionary to store image paths for each time signature
+beat_images = {
+    "2/4": ['screens/2-4_1.png', 'screens/2-4_2.png'],
+    "3/4": ['screens/3-4_1.png', 'screens/3-4_2.png', 'screens/3-4_3.png'],
+    "4/4": ['screens/4-4_1.png', 'screens/4-4_2.png', 'screens/4-4_3.png', 'screens/4-4_4.png'],
+    "6/8": ['screens/6-8_1.png', 'screens/6-8_2.png', 'screens/6-8_3.png', 'screens/6-8_4.png', 'screens/6-8_5.png', 'screens/6-8_6.png']
+}
 
+# Load the beat images
+beat_images_loaded = {}
+for key, paths in beat_images.items():
+    beat_images_loaded[key] = [Image.open(path).convert('1') for path in paths]
 class Metronome:
     def __init__(self, bpm, beats_per_bar, total_bars):
         self.update_params(bpm, beats_per_bar, total_bars)
@@ -31,6 +42,7 @@ class Metronome:
         self.bpm = bpm
         self.beats_per_bar = beats_per_bar
         self.total_bars = total_bars
+        self.time_signature = config_option_values["TIME SIGNATURE"]
 
         self.interval = 60 / bpm
         self.duration = self.interval * beats_per_bar * total_bars  # Loop duration in seconds
@@ -96,7 +108,7 @@ class Track:
         self.recorder = None
         self.initialized = False  # Flag to ensure initialization only happens once
         self.hp_freq = 400  # Highpass filter frequency
-        self.lp_freq = 4000 # Lowpass filter frequency
+        self.lp_freq = 4000  # Lowpass filter frequency
 
     def start_recording(self):
         self.recorder.play()
@@ -113,6 +125,10 @@ class Track:
     def print_countdown(self):
         if self.metronome.countdown_counter.get() <= self.metronome.beats_per_bar:
             print("Countdown counter:", self.metronome.countdown_counter.get())
+            beat_count = int(self.metronome.countdown_counter.get())
+            image_index = beat_count - 1
+            beat_image = beat_images_loaded[self.metronome.time_signature][image_index]
+            draw_countdown_screen(beat_count, beat_image)
     
     def print_beat(self):
         print("Current beat:", self.metronome.current_beat.get())
@@ -123,7 +139,7 @@ class Track:
             self.input = Input([0, 1])
             self.recorder = TableRec(self.input, table=self.table, fadetime=0.005)
             self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=20, xfade=0)
-            self.highpass = ButHP(self.playback, freq=self.hp_freq) # Apply highpass filter
+            self.highpass = ButHP(self.playback, freq=self.hp_freq)  # Apply highpass filter
             self.lowpass = ButLP(self.highpass, freq=self.lp_freq)
             self.ex = Expand(self.lowpass, downthresh=-90, upthresh=-90, ratio=2, mul=0.1)
             self.harm = Harmonizer(self.ex, transpo=0, winsize=0.05).out()
@@ -148,7 +164,7 @@ class Track:
             self.input = Input([0, 1])
             self.recorder = TableRec(self.input, table=self.table, fadetime=0.01).out()
             self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=20, xfade=0)
-            self.highpass = ButHP(self.playback, freq=self.hp_freq) # Apply highpass filter
+            self.highpass = ButHP(self.playback, freq=self.hp_freq)  # Apply highpass filter
             self.lowpass = ButLP(self.highpass, freq=self.lp_freq)
             self.ex = Expand(self.lowpass, downthresh=-90, upthresh=-90, ratio=2, mul=0.1)
             self.harm = Harmonizer(self.ex, transpo=0, winsize=0.05).out()
@@ -301,20 +317,6 @@ device = sh1106(serial)
 # Path to your TTF font file
 font_path = 'fonts/InputSansNarrow-Thin.ttf'
 
-# Dictionary to store image paths for each time signature
-beat_images = {
-    "2/4": ['screens/2-4_1.png', 'screens/2-4_2.png'],
-    "3/4": ['screens/3-4_1.png', 'screens/3-4_2.png', 'screens/3-4_3.png'],
-    "4/4": ['screens/4-4_1.png', 'screens/4-4_2.png', 'screens/4-4_3.png', 'screens/4-4_4.png'],
-    "6/8": ['screens/6-8_1.png', 'screens/6-8_2.png', 'screens/6-8_3.png', 'screens/6-8_4.png', 'screens/6-8_5.png', 'screens/6-8_6.png']
-}
-
-# Load the beat images
-beat_images_loaded = {}
-for key, paths in beat_images.items():
-    beat_images_loaded[key] = [Image.open(path).convert('1') for path in paths]
-
-
 # Menu options
 menu_options = ["GRABAR", "CONFIG"]
 current_menu_option = 0
@@ -335,6 +337,34 @@ current_screen = "menu"
 server = s  # Replace with your server instance
 loop_station = LoopStation(server, config_option_values)
 track_initializer = TrackInitializer(loop_station)
+
+def draw_countdown_screen(beat_count, beat_image):
+    with lock:
+        # Create a new image for the countdown screen
+        image = Image.new('1', (64, 128), "black")
+        draw = ImageDraw.Draw(image)
+
+        # Load the beat image
+        image.paste(beat_image, (0, 0))
+
+        # Load a custom font
+        font_size = 30  # Adjust the font size as needed
+        font = ImageFont.truetype(font_path, font_size)
+
+        # Draw the countdown number
+        text = str(beat_count)
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        text_x = (64 - text_width) // 2
+        text_y = (128 - text_height) // 2
+        draw.text((text_x, text_y), text, font=font, fill="white")  # White text
+
+        # Rotate the image by 90 degrees to fit the landscape display
+        rotated_image = image.rotate(270, expand=True)
+
+        # Display the rotated image on the device
+        device.display(rotated_image)
 
 def draw_menu():
     global current_menu_option
@@ -424,75 +454,6 @@ def draw_config_screen():
         # Display the rotated image on the device
         device.display(rotated_image)
 
-def draw_status_screen():
-    with lock:
-        # Create an image for the status screen
-        image = Image.new('1', (64, 128), "black")
-        draw = ImageDraw.Draw(image)
-        
-        # Load a custom font
-        font_size = 12  # Adjust the font size as needed
-        font = ImageFont.truetype(font_path, font_size)
-        
-        # Draw status for each track
-        for i, track in enumerate(loop_station.tracks):
-            status_text = f"Track {i+1}: {'Recording' if track.initialized else 'Idle'}"
-            draw.text((0, i * 14), status_text, font=font, fill="white")
-        
-        # Draw looper status
-        looper_status = "Looper: Recording" if any(track.initialized for track in loop_station.tracks) else "Looper: Idle"
-        draw.text((0, len(loop_station.tracks) * 14), looper_status, font=font, fill="white")
-        
-        # Rotate the image by 90 degrees to fit the landscape display
-        rotated_image = image.rotate(270, expand=True)
-        
-        # Display the rotated image on the device
-        device.display(rotated_image)
-
-def countdown(total_beats, beat_interval, beat_images):
-    beat_count = total_beats
-    images = beat_images_loaded[time_signature]
-    
-    try:
-        while beat_count > 0:
-            # Display the current beat image with the countdown number overlay
-            image_index = total_beats - beat_count
-            draw_countdown_image(images[image_index], str(beat_count))
-            time.sleep(beat_interval)
-            beat_count -= 1
-    
-    except KeyboardInterrupt:
-        GPIO.cleanup()
-
-def draw_countdown_image(image, text):
-    # Create a new image for drawing text in portrait mode dimensions
-    temp_image = Image.new('1', (64, 128), "black")
-    draw = ImageDraw.Draw(temp_image)
-    
-    # Paste the beat image onto the temporary image
-    temp_image.paste(image, (0, 0))
-    
-    # Load a custom font
-    font_size = 30  # Adjust the font size as needed
-    font = ImageFont.truetype(font_path, font_size)
-    
-    # Calculate text position
-    bbox = draw.textbbox((0, 0), text, font=font)
-    text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
-    text_x = (64 - text_width) // 2
-    text_y = (128 - text_height) // 2
-    
-    # Draw text on the image
-    draw.text((text_x, text_y), text, font=font, fill="white")  # White text
-    
-    # Rotate the image by 90 degrees to fit the landscape display
-    rotated_image = temp_image.rotate(270, expand=True)
-    
-    # Display the rotated image on the device
-    device.display(rotated_image)
-
-
 def handle_rotary_encoder():
     global counter, direction, prev_CLK_state, current_config_option, current_menu_option, current_screen
     while True:
@@ -559,8 +520,6 @@ def update_screen():
             draw_menu()
         elif current_screen == "config":
             draw_config_screen()
-        elif current_screen == "status":
-            draw_status_screen()
         time.sleep(0.1)  # Update the screen every 0.1 seconds
 
 try:
