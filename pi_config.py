@@ -42,6 +42,56 @@ def setup_rotary_encoder():
     # Read the initial state of the rotary encoder's CLK pin
     prev_CLK_state = GPIO.input(CLK_PIN)
 
+def setup_matrix_keypad():
+    global row_pins, col_pins, rows, key_map
+    
+    # Define the GPIO pins for rows and columns of the matrix keypad
+    row_pins = [12, 1]
+    col_pins = [13, 6, 5]
+
+    # Initialize buttons for rows with pull-down resistors
+    rows = [Button(pin, pull_up=False) for pin in row_pins]
+
+    # Set up columns as output and set them to high
+    for col in col_pins:
+        GPIO.setup(col, GPIO.OUT)
+        GPIO.output(col, GPIO.HIGH)
+
+    # Dictionary to hold the key mapping for matrix keypad
+    key_map = {
+        (1, 13): 1, (1, 6): 2, (1, 5): 3,
+        (12, 13): 4, (12, 6): 5, (12, 5): 6
+    }
+
+    # Attach the callback function to the button press event for each row
+    for row in rows:
+        row.when_pressed = lambda row=row: matrix_button_pressed(row)
+
+def matrix_button_pressed(row_pin):
+    global current_config_option
+
+    # Disable all column outputs
+    for col in col_pins:
+        GPIO.output(col, GPIO.LOW)
+
+    # Detect which button was pressed
+    for col in col_pins:
+        GPIO.output(col, GPIO.HIGH)
+        time.sleep(0.01)  # Debounce delay
+        if row_pin.is_pressed:
+            key = key_map.get((row_pin.pin.number, col), None)
+            if key:
+                print(f"Matrix Keypad:: Key pressed: {key}")
+                if key == 1:  # Advance configuration option when key 1 is pressed
+                    with lock:
+                        current_config_option = (current_config_option + 1) % len(config_options)
+                        print(f"Switched to: {config_options[current_config_option]}")
+        GPIO.output(col, GPIO.LOW)
+
+    # Re-enable all column outputs
+    for col in col_pins:
+        GPIO.output(col, GPIO.HIGH)
+
 # Initialize I2C interface and OLED display
 serial = i2c(port=1, address=0x3C)
 device = sh1106(serial)
@@ -59,8 +109,9 @@ config_option_values = {
 time_signature_options = ["2/4", "3/4", "4/4"]
 current_config_option = 0
 
-# Set up the rotary encoder
+# Set up the rotary encoder and matrix keypad
 setup_rotary_encoder()
+setup_matrix_keypad()
 
 def draw_config_screen():
     global current_config_option
@@ -150,27 +201,6 @@ def handle_rotary_encoder():
 
         time.sleep(0.001)  # Small delay to prevent CPU overuse
 
-def handle_encoder_button():
-    global button_pressed, prev_button_state, current_config_option
-    while True:
-        # State change detection for the button
-        button_state = GPIO.input(SW_PIN)
-        if button_state != prev_button_state:
-            time.sleep(0.01)  # Add a small delay to debounce
-            if button_state == GPIO.LOW:
-                print("Rotary Encoder Button:: The button is pressed")
-                button_pressed = True
-                with lock:
-                    # Move to the next configuration option
-                    current_config_option = (current_config_option + 1) % len(config_options)
-                    print(f"Switched to: {config_options[current_config_option]}")
-            else:
-                button_pressed = False
-
-        prev_button_state = button_state
-
-        time.sleep(0.001)  # Small delay to prevent CPU overuse
-
 def update_screen():
     while True:
         draw_config_screen()
@@ -178,10 +208,9 @@ def update_screen():
 
 try:
     print(f"Listening for rotary encoder changes and button presses...")
-    
+
     # Start threads for handling the rotary encoder, button press, and screen update
     threading.Thread(target=handle_rotary_encoder, daemon=True).start()
-    threading.Thread(target=handle_encoder_button, daemon=True).start()
     threading.Thread(target=update_screen, daemon=True).start()
 
     # Keep the main thread running
