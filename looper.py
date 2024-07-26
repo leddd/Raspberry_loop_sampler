@@ -34,6 +34,7 @@ beat_images = {
 beat_images_loaded = {}
 for key, paths in beat_images.items():
     beat_images_loaded[key] = [Image.open(path).convert('1') for path in paths]
+
 class Metronome:
     def __init__(self, bpm, beats_per_bar, total_bars):
         self.update_params(bpm, beats_per_bar, total_bars)
@@ -128,7 +129,6 @@ class Track:
             beat_count = int(self.metronome.countdown_counter.get())
             image_index = beat_count - 1
             beat_image = beat_images_loaded[self.metronome.time_signature][image_index]
-            current_screen = "countdown"  # Switch to countdown screen
             draw_countdown_screen(beat_count, beat_image)
     
     def print_beat(self):
@@ -521,10 +521,7 @@ def update_screen():
             draw_menu()
         elif current_screen == "config":
             draw_config_screen()
-        elif current_screen == "countdown":
-            # Countdown screen is updated by the Track class directly
-            pass
-        time.sleep(0.01)  # Update the screen every 0.01 seconds
+        time.sleep(0.05)  # Update the screen every 0.05 seconds
 
 try:
     print(f"Listening for rotary encoder changes and button presses...")
