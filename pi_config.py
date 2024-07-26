@@ -43,8 +43,9 @@ def setup_rotary_encoder():
     prev_CLK_state = GPIO.input(CLK_PIN)
 
 def setup_matrix_keypad():
-    global row_pins, col_pins, rows, key_map
-    
+    global row_pins, col_pins, rows, key_map, debounce_time
+    debounce_time = 0.1  # 100 ms debounce time
+
     # Define the GPIO pins for rows and columns of the matrix keypad
     row_pins = [12, 1]
     col_pins = [13, 6, 5]
@@ -77,7 +78,7 @@ def matrix_button_pressed(row_pin):
     # Detect which button was pressed
     for col in col_pins:
         GPIO.output(col, GPIO.HIGH)
-        time.sleep(0.01)  # Debounce delay
+        time.sleep(debounce_time)  # Debounce delay
         if row_pin.is_pressed:
             key = key_map.get((row_pin.pin.number, col), None)
             if key:
