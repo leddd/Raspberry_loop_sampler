@@ -355,7 +355,7 @@ def draw_menu():
             y_offset += text_height + 4  # Adjust spacing as needed
 
         # Draw current settings
-        settings = [f"{config_option_values['BPM']} BPM", config_option_values["TIME SIGNATURE"], f"{config_option_values['TOTAL BARS']} BARS"]
+        settings = [f"{config_option_values['BPM']}BPM", config_option_values["TIME SIGNATURE"], f"{config_option_values['TOTAL BARS']}BARS"]
         settings_start_y = 128 - (len(settings) * (text_height + 4))  # Adjust the bottom margin if necessary
         y_offset = max(y_offset, settings_start_y)
         for setting in settings:
@@ -387,11 +387,11 @@ def draw_config_screen():
         # Draw config option
         option = config_options[current_config_option]
         if option == "BPM":
-            value = f"{config_option_values[option]} BPM"
+            value = f"{config_option_values[option]}BPM"
         elif option == "TIME SIGNATURE":
             value = config_option_values[option]
         elif option == "TOTAL BARS":
-            value = f"{config_option_values[option]} BARS"
+            value = f"{config_option_values[option]}BARS"
 
         # Calculate text position
         bbox = draw.textbbox((0, 0), value, font=font)  # Get bounding box
