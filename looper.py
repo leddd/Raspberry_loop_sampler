@@ -125,17 +125,6 @@ class Track:
         self.playback.stop()
         print("Stopped Playback.")
         
-    def print_countdown(self):
-        if self.metronome.countdown_counter.get() <= self.metronome.beats_per_bar:
-            print("Countdown counter:", self.metronome.countdown_counter.get())
-            beat_count = int(self.metronome.countdown_counter.get())
-            image_index = beat_count - 1
-            beat_image = beat_images_loaded[self.metronome.time_signature][image_index]
-            draw_countdown_screen(beat_count, beat_image)
-    
-    def print_beat(self):
-        print("Current beat:", self.metronome.current_beat.get())
-        
     def rec_master_track(self): 
         if self.metronome.countdown_counter.get() == self.metronome.beats_per_bar + 1:
             self.table = NewTable(length=self.metronome.duration, chnls=self.channels, feedback=self.feedback)
@@ -156,10 +145,8 @@ class Track:
         self.trig_rec_master = TrigFunc(self.metronome.countdown_metro, self.rec_master_track)
         
         self.trig_countdown = TrigFunc(self.metronome.countdown_metro, self.metronome.countdown_click)
-        self.trig_print_countdown = TrigFunc(self.metronome.countdown_metro, self.print_countdown)
         
         self.trig_click = TrigFunc(self.metronome.metro, self.metronome.regular_click)
-        self.trig_print_beat = TrigFunc(self.metronome.metro, self.print_beat)
         
     def rec_track(self):
         if not self.initialized:
@@ -509,15 +496,6 @@ def matrix_button_pressed(row_pin):
     for col in col_pins:
         GPIO.output(col, GPIO.HIGH)
 
-# Update screen thread
-def update_screen():
-    while True:
-        if current_screen == "menu":
-            draw_menu()
-        elif current_screen == "config":
-            draw_config_screen()
-        time.sleep(0.1)  # Update the screen every 0.1 seconds
-
 # Countdown screen thread
 def countdown_screen_thread():
     while True:
@@ -528,6 +506,15 @@ def countdown_screen_thread():
                 beat_image = beat_images_loaded[loop_station.metronome.time_signature][image_index]
                 draw_countdown_screen(beat_count, beat_image)
         time.sleep(0.1)
+
+# Update screen thread
+def update_screen():
+    while True:
+        if current_screen == "menu":
+            draw_menu()
+        elif current_screen == "config":
+            draw_config_screen()
+        time.sleep(0.1)  # Update the screen every 0.1 seconds
 
 # Set up the rotary encoder and matrix keypad
 setup_rotary_encoder()
