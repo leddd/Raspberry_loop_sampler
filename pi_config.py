@@ -20,41 +20,8 @@ config_option_values = {
     "TIME SIGNATURE": "4/4",
     "TOTAL BARS": 4
 }
-time_signature_options = ["2/4", "3/4", "4/4", "6/8"]
+time_signature_options = ["2/4", "3/4", "4/4"]
 current_config_option = 0
-
-DIRECTION_CW = 0
-DIRECTION_CCW = 1
-
-counter = 0
-direction = DIRECTION_CW
-CLK_state = 0
-prev_CLK_state = 0
-
-button_pressed = False
-prev_button_state = GPIO.HIGH
-
-# Disable GPIO warnings
-GPIO.setwarnings(False)
-
-# Reset the GPIO pins
-GPIO.cleanup()
-
-# Set up the GPIO mode
-GPIO.setmode(GPIO.BCM)
-
-# Define the GPIO pins for the rotary encoder
-CLK_PIN = 17  # GPIO22 connected to the rotary encoder's CLK pin
-DT_PIN = 27   # GPIO27 connected to the rotary encoder's DT pin
-SW_PIN = 22   # GPIO17 connected to the rotary encoder's SW pin
-
-# Set up GPIO pins for rotary encoder
-GPIO.setup(CLK_PIN, GPIO.IN)
-GPIO.setup(DT_PIN, GPIO.IN)
-GPIO.setup(SW_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-# Read the initial state of the rotary encoder's CLK pin
-prev_CLK_state = GPIO.input(CLK_PIN)
 
 def draw_config_screen():
     # Create an image in portrait mode dimensions
@@ -90,42 +57,85 @@ def draw_config_screen():
     # Display the rotated image on the device
     device.display(rotated_image)
 
+# Define the GPIO pins for the rotary encoder
+CLK_PIN = 17  # GPIO7 connected to the rotary encoder's CLK pin
+DT_PIN = 27   # GPIO8 connected to the rotary encoder's DT pin
+SW_PIN = 22   # GPIO25 connected to the rotary encoder's SW pin
+
+DIRECTION_CW = 0
+DIRECTION_CCW = 1
+
+counter = 0
+direction = DIRECTION_CW
+prev_CLK_state = GPIO.HIGH
+
+button_pressed = False
+prev_button_state = GPIO.HIGH
+
+# Disable GPIO warnings
+GPIO.setwarnings(False)
+
+# Reset the GPIO pins
+GPIO.cleanup()
+
+# Set up the GPIO mode
+GPIO.setmode(GPIO.BCM)
+
+# Set up GPIO pins for rotary encoder
+GPIO.setup(CLK_PIN, GPIO.IN)
+GPIO.setup(DT_PIN, GPIO.IN)
+GPIO.setup(SW_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+# Read the initial state of the rotary encoder's CLK pin
+prev_CLK_state = GPIO.input(CLK_PIN)
+
 # Function to handle rotary encoder
 def handle_rotary_encoder():
     global counter, direction, prev_CLK_state, current_config_option
 
-    # Read the current state of the rotary encoder's CLK pin
+    # Read the current state of the rotary encoder's CLK and DT pins
     CLK_state = GPIO.input(CLK_PIN)
+    DT_state = GPIO.input(DT_PIN)
 
     # If the state of CLK is changed, then pulse occurred
-    # React to only the rising edge (from LOW to HIGH) to avoid double count
-    if CLK_state != prev_CLK_state and CLK_state == GPIO.HIGH:
-        # If the DT state is HIGH, the encoder is rotating in counter-clockwise direction
-        # Decrease the counter
-        if GPIO.input(DT_PIN) == GPIO.HIGH:
-            direction = DIRECTION_CCW
-        else:
-            # The encoder is rotating in clockwise direction => increase the counter
+    if CLK_state != prev_CLK_state:
+        # Determine the direction
+        if DT_state != CLK_state:
             direction = DIRECTION_CW
+        else:
+            direction = DIRECTION_CCW
 
-        if direction == DIRECTION_CW:
-            if current_config_option == 0:  # BPM
-                config_option_values["BPM"] = min(300, config_option_values["BPM"] + 1)
-            elif current_config_option == 1:  # TIME SIGNATURE
-                current_ts_index = time_signature_options.index(config_option_values["TIME SIGNATURE"])
-                config_option_values["TIME SIGNATURE"] = time_signature_options[(current_ts_index + 1) % len(time_signature_options)]
-            elif current_config_option == 2:  # TOTAL BARS
-                config_option_values["TOTAL BARS"] = min(8, config_option_values["TOTAL BARS"] + 1)
-        elif direction == DIRECTION_CCW:
-            if current_config_option == 0:  # BPM
-                config_option_values["BPM"] = max(1, config_option_values["BPM"] - 1)
-            elif current_config_option == 1:  # TIME SIGNATURE
-                current_ts_index = time_signature_options.index(config_option_values["TIME SIGNATURE"])
-                config_option_values["TIME SIGNATURE"] = time_signature_options[(current_ts_index - 1) % len(time_signature_options)]
-            elif current_config_option == 2:  # TOTAL BARS
-                config_option_values["TOTAL BARS"] = max(1, config_option_values["TOTAL BARS"] - 1)
+        counter += 1
+        if counter % 2 == 0:  # Only update on every second step
+            option = config_options[current_config_option]
+            if option == "BPM":
+                if direction == DIRECTION_CW:
+                    config_option_values[option] += 1
+                    if config_option_values[option] > 200:
+                        config_option_values[option] = 200
+                else:
+                    config_option_values[option] -= 1
+                    if config_option_values[option] < 40:
+                        config_option_values[option] = 40
+            elif option == "TIME SIGNATURE":
+                index = time_signature_options.index(config_option_values[option])
+                if direction == DIRECTION_CW:
+                    index = (index + 1) % len(time_signature_options)
+                else:
+                    index = (index - 1) % len(time_signature_options)
+                config_option_values[option] = time_signature_options[index]
+            elif option == "TOTAL BARS":
+                if direction == DIRECTION_CW:
+                    config_option_values[option] += 1
+                    if config_option_values[option] > 16:
+                        config_option_values[option] = 16
+                else:
+                    config_option_values[option] -= 1
+                    if config_option_values[option] < 1:
+                        config_option_values[option] = 1
 
-        draw_config_screen()
+            print(f"{option}: {config_option_values[option]}")
+            draw_config_screen()  # Update the screen with the new value
 
     # Save last CLK state
     prev_CLK_state = CLK_state
@@ -139,25 +149,23 @@ def handle_encoder_button():
     if button_state != prev_button_state:
         time.sleep(0.01)  # Add a small delay to debounce
         if button_state == GPIO.LOW:
+            print("Rotary Encoder Button:: The button is pressed")
             button_pressed = True
-            if current_config_option < len(config_options) - 1:
-                current_config_option += 1
-            else:
-                # Save settings and exit config
-                print("Configuration complete.")
-                exit()
-            draw_config_screen()
+            # Move to the next configuration option
+            current_config_option = (current_config_option + 1) % len(config_options)
+            print(f"Switched to: {config_options[current_config_option]}")
+            draw_config_screen()  # Update the screen with the new option
         else:
             button_pressed = False
 
     prev_button_state = button_state
 
 try:
-    print(f"Listening for rotary encoder changes...")
-    draw_config_screen()
+    print(f"Listening for rotary encoder changes and button presses...")
+    draw_config_screen()  # Draw the initial config screen
     while True:
         handle_rotary_encoder()
         handle_encoder_button()
-        time.sleep(0.01)  # Small delay to prevent CPU overuse
+        time.sleep(0.001)  # Small delay to prevent CPU overuse
 except KeyboardInterrupt:
     GPIO.cleanup()  # Clean up GPIO on program exit
