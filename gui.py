@@ -86,6 +86,9 @@ SW_PIN = 22   # GPIO25 connected to the rotary encoder's SW pin
 # Disable GPIO warnings
 GPIO.setwarnings(False)
 
+# Clean up GPIO pins
+GPIO.cleanup()
+
 # Set up the GPIO mode
 GPIO.setmode(GPIO.BCM)
 
@@ -126,7 +129,7 @@ def button_callback(channel):
             # Add action for CONFIG
 
 # Set up event detection for rotary encoder
-GPIO.add_event_detect(CLK_PIN, GPIO.BOTH, callback=rotary_callback, bouncetime=1)
+GPIO.add_event_detect(CLK_PIN, GPIO.BOTH, callback=rotary_callback)
 GPIO.add_event_detect(SW_PIN, GPIO.FALLING, callback=button_callback, bouncetime=200)
 
 try:
