@@ -136,6 +136,7 @@ class Track:
             self.ex = Expand(self.lowpass, downthresh=-90, upthresh=-90, ratio=2, mul=0.1)
             self.harm = Harmonizer(self.ex, transpo=0, winsize=0.05).out()
             self.master_trig = CallAfter(self.start_recording, latency)
+            draw_grabando_overlay()  # Call the function to display the overlay
 
         if self.metronome.countdown_counter.get() == self.metronome.beats_per_bar * (1 + self.metronome.total_bars) + 1:
             self.metronome.play_clicks = False
@@ -159,6 +160,7 @@ class Track:
             self.ex = Expand(self.lowpass, downthresh=-90, upthresh=-90, ratio=2, mul=0.1)
             self.harm = Harmonizer(self.ex, transpo=0, winsize=0.05).out()
             self.track_trig = CallAfter(self.start_recording, latency)
+            draw_grabando_overlay()  # Call the function to display the overlay
             self.initialized = True
         
     def init_track(self, master):
@@ -327,6 +329,33 @@ def draw_config_screen():
 
         # Draw text on the screen
         draw.text((text_x, text_y), value, font=font, fill="white")
+        
+        # Rotate the image by 90 degrees to fit the landscape display
+        rotated_image = image.rotate(270, expand=True)
+        
+        # Display the rotated image on the device
+        device.display(rotated_image)
+
+def draw_grabando_overlay():
+    with lock:
+        # Create an image in portrait mode dimensions
+        image = Image.new('1', (64, 128), "black")
+        draw = ImageDraw.Draw(image)
+        
+        # Load a custom font
+        font_size = 30  # Adjust the font size as needed
+        font = ImageFont.truetype(font_path, font_size)
+
+        # Draw 'GRABANDO' on the screen
+        text = "GRABANDO"
+        bbox = draw.textbbox((0, 0), text, font=font)  # Get bounding box
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        text_x = (64 - text_width) // 2
+        text_y = (128 - text_height) // 2  # Center the text vertically
+
+        # Draw text on the screen
+        draw.text((text_x, text_y), text, font=font, fill="white")
         
         # Rotate the image by 90 degrees to fit the landscape display
         rotated_image = image.rotate(270, expand=True)
