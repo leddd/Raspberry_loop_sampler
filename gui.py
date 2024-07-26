@@ -1,17 +1,19 @@
 import time
 import RPi.GPIO as GPIO
 from gpiozero import Button
-from signal import pause
+from PIL import Image, ImageDraw, ImageFont
+from luma.core.interface.serial import i2c, spi
+from luma.core.render import canvas
+from luma.oled.device import sh1106
 
-# Define the GPIO pins for the rotary encoder
-CLK_PIN = 17  # GPIO7 connected to the rotary encoder's CLK pin
-DT_PIN = 27   # GPIO8 connected to the rotary encoder's DT pin
-SW_PIN = 22   # GPIO25 connected to the rotary encoder's SW pin
+# Initialize I2C interface and OLED display
+serial = i2c(port=1, address=0x3C)
+device = sh1106(serial)
 
-DIRECTION_CW = 0
-DIRECTION_CCW = 1
+# Path to your TTF font file
+font_path = 'fonts/InputSansNarrow-Thin.ttf'
 
-# Configuration options and initial values
+# CONFIG options
 config_options = ["BPM", "TIME SIGNATURE", "TOTAL BARS"]
 config_option_values = {
     "BPM": 120,
@@ -20,6 +22,48 @@ config_option_values = {
 }
 time_signature_options = ["2/4", "3/4", "4/4"]
 current_config_option = 0
+
+def draw_config_screen():
+    # Create an image in portrait mode dimensions
+    image = Image.new('1', (64, 128), "black")
+    draw = ImageDraw.Draw(image)
+    
+    # Load a custom font
+    font_size = 12  # Adjust the font size as needed
+    font = ImageFont.truetype(font_path, font_size)
+
+    # Draw config option
+    option = config_options[current_config_option]
+    if option == "BPM":
+        value = f"{config_option_values[option]} BPM"
+    elif option == "TIME SIGNATURE":
+        value = config_option_values[option]
+    elif option == "TOTAL BARS":
+        value = f"{config_option_values[option]} BARS"
+
+    # Calculate text position
+    bbox = draw.textbbox((0, 0), value, font=font)  # Get bounding box
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    text_x = (64 - text_width) // 2
+    text_y = (128 - text_height) // 2 + 8  # Slightly below center, moved 5 pixels up
+
+    # Draw text on the screen
+    draw.text((text_x, text_y), value, font=font, fill="white")
+    
+    # Rotate the image by 90 degrees to fit the landscape display
+    rotated_image = image.rotate(270, expand=True)
+    
+    # Display the rotated image on the device
+    device.display(rotated_image)
+
+# Define the GPIO pins for the rotary encoder
+CLK_PIN = 17  # GPIO7 connected to the rotary encoder's CLK pin
+DT_PIN = 27   # GPIO8 connected to the rotary encoder's DT pin
+SW_PIN = 22   # GPIO25 connected to the rotary encoder's SW pin
+
+DIRECTION_CW = 0
+DIRECTION_CCW = 1
 
 counter = 0
 direction = DIRECTION_CW
@@ -91,6 +135,7 @@ def handle_rotary_encoder():
                         config_option_values[option] = 1
 
             print(f"{option}: {config_option_values[option]}")
+            draw_config_screen()  # Update the screen with the new value
 
     # Save last CLK state
     prev_CLK_state = CLK_state
@@ -109,6 +154,7 @@ def handle_encoder_button():
             # Move to the next configuration option
             current_config_option = (current_config_option + 1) % len(config_options)
             print(f"Switched to: {config_options[current_config_option]}")
+            draw_config_screen()  # Update the screen with the new option
         else:
             button_pressed = False
 
@@ -116,6 +162,7 @@ def handle_encoder_button():
 
 try:
     print(f"Listening for rotary encoder changes and button presses...")
+    draw_config_screen()  # Draw the initial config screen
     while True:
         handle_rotary_encoder()
         handle_encoder_button()
