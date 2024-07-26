@@ -94,6 +94,9 @@ prev_CLK_state = 0
 button_pressed = False
 prev_button_state = GPIO.HIGH
 
+# Debounce time for the rotary encoder in seconds
+DEBOUNCE_TIME = 0.01
+
 # Disable GPIO warnings
 GPIO.setwarnings(False)
 
@@ -122,21 +125,27 @@ def handle_rotary_encoder():
 
     # If the state of CLK is changed, then pulse occurred
     if CLK_state != prev_CLK_state:
-        # Determine the direction
-        if DT_state != CLK_state:
-            counter += 1
-            direction = DIRECTION_CW
-            current_option = (current_option + 1) % len(menu_options)
-        else:
-            counter -= 1
-            direction = DIRECTION_CCW
-            current_option = (current_option - 1) % len(menu_options)
+        # Debounce by ensuring the change is stable
+        time.sleep(DEBOUNCE_TIME)
+        CLK_state = GPIO.input(CLK_PIN)
+        DT_state = GPIO.input(DT_PIN)
 
-        print("Rotary Encoder:: direction:", "CLOCKWISE" if direction == DIRECTION_CW else "ANTICLOCKWISE",
-              "- count:", counter)
+        if CLK_state != prev_CLK_state:
+            # Determine the direction
+            if DT_state != CLK_state:
+                counter += 1
+                direction = DIRECTION_CW
+                current_option = (current_option + 1) % len(menu_options)
+            else:
+                counter -= 1
+                direction = DIRECTION_CCW
+                current_option = (current_option - 1) % len(menu_options)
 
-        # Redraw the menu with the updated current_option
-        draw_menu(current_option)
+            print("Rotary Encoder:: direction:", "CLOCKWISE" if direction == DIRECTION_CW else "ANTICLOCKWISE",
+                  "- count:", counter)
+
+            # Redraw the menu with the updated current_option
+            draw_menu(current_option)
 
     # Save last CLK and DT state
     prev_CLK_state = CLK_state
@@ -149,7 +158,8 @@ def handle_encoder_button():
     # State change detection for the button
     button_state = GPIO.input(SW_PIN)
     if button_state != prev_button_state:
-        time.sleep(0.01)  # Add a small delay to debounce
+        time.sleep(DEBOUNCE_TIME)  # Add a small delay to debounce
+        button_state = GPIO.input(SW_PIN)
         if button_state == GPIO.LOW:
             print("Rotary Encoder Button:: The button is pressed")
             button_pressed = True
