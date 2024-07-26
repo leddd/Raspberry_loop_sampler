@@ -1,12 +1,11 @@
-from pyo import *
-from gpiozero import Button
-import RPi.GPIO as GPIO
 import time
 import threading
+import RPi.GPIO as GPIO
+from gpiozero import Button
+from PIL import ImageFont, ImageDraw, Image, ImageFont
 from luma.core.interface.serial import i2c
 from luma.oled.device import sh1106
-from luma.core.render import canvas
-from PIL import ImageFont, ImageDraw, Image, ImageFont
+from pyo import *
 
 # Initialize server
 s = Server(sr=48000, buffersize=2048, audio='pa', nchnls=1, ichnls=1, duplex=1)
@@ -16,13 +15,18 @@ s.boot()
 s.start()
 
 # User-defined parameters
-bpm = 120
-beats_per_bar = 4
-total_bars = 2
+config_option_values = {
+    "BPM": 120,
+    "TIME SIGNATURE": "4/4",
+    "TOTAL BARS": 2
+}
 latency = 0.115  # Latency in seconds
 
 class Metronome:
     def __init__(self, bpm, beats_per_bar, total_bars):
+        self.update_params(bpm, beats_per_bar, total_bars)
+
+    def update_params(self, bpm, beats_per_bar, total_bars):
         self.bpm = bpm
         self.beats_per_bar = beats_per_bar
         self.total_bars = total_bars
@@ -78,6 +82,7 @@ class Metronome:
                 self.fclick.play()
             else:
                 self.fclick2.play()
+
 class Track:
     def __init__(self, server, metronome, channels=2, feedback=0.5):
         self.server = server
@@ -151,13 +156,21 @@ class Track:
         
     def init_track(self, master):
         self.trig_rec = TrigFunc(master.playback['trig'], self.rec_track)
+
 class LoopStation:
-    def __init__(self, server, bpm, beats_per_bar, total_bars):
+    def __init__(self, server, config_option_values):
         self.server = server
+        self.config_option_values = config_option_values
+        self.update_metronome()
+
+    def update_metronome(self):
+        bpm = self.config_option_values["BPM"]
+        beats_per_bar = int(self.config_option_values["TIME SIGNATURE"].split('/')[0])
+        total_bars = self.config_option_values["TOTAL BARS"]
         self.metronome = Metronome(bpm, beats_per_bar, total_bars)
         self.tracks = []
-        
-        self.master_track = Track(server, self.metronome)
+
+        self.master_track = Track(self.server, self.metronome)
         self.tracks.append(self.master_track)
         
     def init_master_track(self):
@@ -169,6 +182,7 @@ class LoopStation:
         track.init_track(self.master_track)
         self.tracks.append(track)
         print(f"Track {track_num} initialized")    
+
 class TrackInitializer:
     def __init__(self, loop_station):
         self.loop_station = loop_station
@@ -269,6 +283,7 @@ def matrix_button_pressed(row_pin):
                                 current_screen = "menu"  # Return to menu after setting TOTAL BARS
                             current_config_option = (current_config_option + 1) % len(config_options)
                             print(f"Switched to: {config_options[current_config_option]}")
+                            loop_station.update_metronome()  # Update metronome with new config
         GPIO.output(col, GPIO.LOW)
 
     # Re-enable all column outputs
@@ -288,11 +303,6 @@ current_menu_option = 0
 
 # CONFIG options
 config_options = ["BPM", "TIME SIGNATURE", "TOTAL BARS"]
-config_option_values = {
-    "BPM": 120,
-    "TIME SIGNATURE": "4/4",
-    "TOTAL BARS": 4
-}
 time_signature_options = ["2/4", "3/4", "4/4"]
 current_config_option = 0
 
@@ -304,8 +314,8 @@ setup_matrix_keypad()
 current_screen = "menu"
 
 # Initialize the LoopStation and TrackInitializer
-server = None  # Replace with your server instance
-loop_station = LoopStation(server, config_option_values["BPM"], int(config_option_values["TIME SIGNATURE"].split('/')[0]), config_option_values["TOTAL BARS"])
+server = s  # Replace with your server instance
+loop_station = LoopStation(server, config_option_values)
 track_initializer = TrackInitializer(loop_station)
 
 def draw_menu():
@@ -449,6 +459,7 @@ def handle_rotary_encoder():
                                     config_option_values[option] = 1
 
                         print(f"{option}: {config_option_values[option]}")
+                        loop_station.update_metronome()  # Update metronome with new config
 
         # Save last CLK state
         prev_CLK_state = CLK_state
