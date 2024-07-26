@@ -1,11 +1,82 @@
-import time
-import RPi.GPIO as GPIO
-from gpiozero import Button
 from luma.core.interface.serial import i2c
 from luma.oled.device import sh1106
 from luma.core.render import canvas
-from PIL import ImageFont, ImageDraw
-from looper import LoopStation, Server
+from PIL import ImageFont, ImageDraw, Image
+import RPi.GPIO as GPIO
+import time
+
+# Initialize the OLED screen
+serial = i2c(port=1, address=0x3C)
+device = sh1106(serial)
+
+# Path to your TTF font file
+font_path = 'fonts/InputSansNarrow-Thin.ttf'
+
+# Menu options
+menu_options = ["GRABAR", "CONFIG"]
+current_option = 0
+
+# Current settings
+bpm = 120
+time_signature = "4/4"
+total_bars = 4
+
+# Padding and margin variables
+top_margin = 6
+bottom_margin = 8
+menu_padding = 8
+settings_padding = 4
+highlight_offset = 2  # Offset of the highlight position
+
+# Load a custom font
+font_size = 12  # You can adjust the font size as needed
+font = ImageFont.truetype(font_path, font_size)
+
+def draw_menu(current_option):
+    # Create an image in portrait mode dimensions
+    image = Image.new('1', (64, 128), "black")
+    draw = ImageDraw.Draw(image)
+    
+    # Draw menu options
+    y_offset = top_margin
+    for i, option in enumerate(menu_options):
+        bbox = draw.textbbox((0, 0), option, font=font)  # Get bounding box
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        text_x = (64 - text_width) // 2
+        text_y = y_offset
+        if i == current_option:
+            # Draw highlight
+            highlight_rect = [
+                0,  # Start at the left edge of the screen
+                text_y - menu_padding + highlight_offset,  # Adjust to position the highlight a bit lower
+                64,  # End at the right edge of the screen
+                text_y + text_height + menu_padding + highlight_offset
+            ]
+            draw.rectangle(highlight_rect, outline="white", fill="white")
+            draw.text((text_x, text_y), option, font=font, fill="black")  # Draw text in black
+        else:
+            draw.text((text_x, text_y), option, font=font, fill="white")  # Draw text in white
+        y_offset += text_height + menu_padding * 2
+
+    # Draw current settings
+    settings = [f"{bpm}BPM", time_signature, f"{total_bars}BARS"]
+    settings_start_y = 128 - bottom_margin - (len(settings) * (text_height + settings_padding * 2))
+    y_offset = max(y_offset, settings_start_y)
+    for setting in settings:
+        bbox = draw.textbbox((0, 0), setting, font=font)  # Get bounding box
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        text_x = (64 - text_width) // 2
+        text_y = y_offset
+        draw.text((text_x, text_y), setting, font=font, fill="white")  # Draw text in white
+        y_offset += text_height + settings_padding * 2
+
+    # Rotate the image by 90 degrees to fit the landscape display
+    rotated_image = image.rotate(270, expand=True)
+    
+    # Display the rotated image on the device
+    device.display(rotated_image)
 
 # Define the GPIO pins for the rotary encoder
 CLK_PIN = 17  # GPIO7 connected to the rotary encoder's CLK pin
@@ -15,133 +86,91 @@ SW_PIN = 22   # GPIO25 connected to the rotary encoder's SW pin
 DIRECTION_CW = 0
 DIRECTION_CCW = 1
 
-class GPIOSetup:
-    def __init__(self, track_initializer):
-        self.row_pins = [12, 1]
-        self.col_pins = [13, 6, 5]
+counter = 0
+direction = DIRECTION_CW
+CLK_state = 0
+prev_CLK_state = 0
 
-        self.key_map = {
-            (1, 13): 1, (1, 6): 2, (1, 5): 3,
-            (12, 13): 4, (12, 6): 5, (12, 5): 6
-        }
+button_pressed = False
+prev_button_state = GPIO.HIGH
 
-        self.track_initializer = track_initializer
+# Disable GPIO warnings
+GPIO.setwarnings(False)
 
-        GPIO.setwarnings(False)
-        GPIO.cleanup()
-        GPIO.setmode(GPIO.BCM)
+# Reset the GPIO pins
+GPIO.cleanup()
 
-        self.rows = [Button(pin, pull_up=False, bounce_time=0.05) for pin in self.row_pins]
+# Set up the GPIO mode
+GPIO.setmode(GPIO.BCM)
 
-        for col in self.col_pins:
-            GPIO.setup(col, GPIO.OUT)
-            GPIO.output(col, GPIO.HIGH)
+# Set up GPIO pins for rotary encoder
+GPIO.setup(CLK_PIN, GPIO.IN)
+GPIO.setup(DT_PIN, GPIO.IN)
+GPIO.setup(SW_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-        for row in self.rows:
-            row.when_pressed = lambda row=row: self.on_button_pressed(row)
-            row.when_released = lambda row=row: self.on_button_released(row)
+# Read the initial state of the rotary encoder's CLK pin
+prev_CLK_state = GPIO.input(CLK_PIN)
+prev_DT_state = GPIO.input(DT_PIN)
 
-    def on_button_pressed(self, row_pin):
-        for col in self.col_pins:
-            GPIO.output(col, GPIO.LOW)
+# Function to handle rotary encoder
+def handle_rotary_encoder():
+    global counter, direction, prev_CLK_state, prev_DT_state, current_option
 
-        for col in self.col_pins:
-            GPIO.output(col, GPIO.HIGH)
-            time.sleep(0.01)
-            if row_pin.is_pressed:
-                key = self.key_map.get((row_pin.pin.number, col), None)
-                if key:
-                    # Placeholder for action based on key press
-                    print(f"Key {key} pressed")
-                break  # Exit the loop after detecting the key press
-            GPIO.output(col, GPIO.LOW)
+    # Read the current state of the rotary encoder's CLK and DT pins
+    CLK_state = GPIO.input(CLK_PIN)
+    DT_state = GPIO.input(DT_PIN)
 
-        for col in self.col_pins:
-            GPIO.output(col, GPIO.HIGH)
+    # If the state of CLK is changed, then pulse occurred
+    if CLK_state != prev_CLK_state:
+        # Determine the direction
+        if DT_state != CLK_state:
+            counter += 1
+            direction = DIRECTION_CW
+            current_option = (current_option + 1) % len(menu_options)
+        else:
+            counter -= 1
+            direction = DIRECTION_CCW
+            current_option = (current_option - 1) % len(menu_options)
 
-    def on_button_released(self, row_pin):
-        # Additional logic for button release
-        pass
+        print("Rotary Encoder:: direction:", "CLOCKWISE" if direction == DIRECTION_CW else "ANTICLOCKWISE",
+              "- count:", counter)
 
-class MenuControls:
-    def __init__(self, loop_station):
-        self.loop_station = loop_station
+        # Redraw the menu with the updated current_option
+        draw_menu(current_option)
 
-        # Initialize OLED display
-        serial = i2c(port=1, address=0x3C)
-        self.device = sh1106(serial)
+    # Save last CLK and DT state
+    prev_CLK_state = CLK_state
+    prev_DT_state = DT_state
 
-        # Initialize GPIO for rotary encoder and keys
-        self.gpio_setup = GPIOSetup(self)
+# Function to handle button press on rotary encoder
+def handle_encoder_button():
+    global button_pressed, prev_button_state
 
-        # Initialize rotary encoder
-        self.counter = 0
-        self.direction = DIRECTION_CW
-        self.CLK_state = 0
-        self.prev_CLK_state = GPIO.input(CLK_PIN)
-        self.prev_DT_state = GPIO.input(DT_PIN)
-        self.button_pressed = False
-        self.prev_button_state = GPIO.HIGH
+    # State change detection for the button
+    button_state = GPIO.input(SW_PIN)
+    if button_state != prev_button_state:
+        time.sleep(0.01)  # Add a small delay to debounce
+        if button_state == GPIO.LOW:
+            print("Rotary Encoder Button:: The button is pressed")
+            button_pressed = True
+            # Trigger the action for the current menu option
+            if current_option == 0:
+                print("Action: GRABAR")
+                # Add action for GRABAR
+            elif current_option == 1:
+                print("Action: CONFIG")
+                # Add action for CONFIG
+        else:
+            button_pressed = False
 
-        GPIO.setup(CLK_PIN, GPIO.IN)
-        GPIO.setup(DT_PIN, GPIO.IN)
-        GPIO.setup(SW_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    prev_button_state = button_state
 
-    def handle_rotary_encoder(self):
-        CLK_state = GPIO.input(CLK_PIN)
-        DT_state = GPIO.input(DT_PIN)
-
-        if CLK_state != self.prev_CLK_state:
-            if DT_state != CLK_state:
-                self.counter += 1
-                self.direction = DIRECTION_CW
-            else:
-                self.counter -= 1
-                self.direction = DIRECTION_CCW
-
-            print("Rotary Encoder:: direction:", "CLOCKWISE" if self.direction == DIRECTION_CW else "ANTICLOCKWISE",
-                  "- count:", self.counter)
-
-        self.prev_CLK_state = CLK_state
-        self.prev_DT_state = DT_state
-
-    def handle_encoder_button(self):
-        button_state = GPIO.input(SW_PIN)
-        if button_state != self.prev_button_state:
-            time.sleep(0.01)  # Add a small delay to debounce
-            if button_state == GPIO.LOW:
-                print("Rotary Encoder Button:: The button is pressed")
-                self.button_pressed = True
-            else:
-                self.button_pressed = False
-
-        self.prev_button_state = button_state
-
-    def display_message(self, message):
-        with canvas(self.device) as draw:
-            font = ImageFont.load_default()
-            draw.text((0, 0), message, font=font, fill=255)
-
-if __name__ == "__main__":
-    # Initialize the server
-    server = Server(sr=48000, buffersize=2048, audio='pa', nchnls=1, ichnls=1, duplex=1)
-    server.setInputDevice(1)
-    server.setOutputDevice(0)
-    server.boot()
-    server.start()
-
-    bpm = 120
-    beats_per_bar = 4
-    total_bars = 2
-
-    loop_station = LoopStation(server, bpm, beats_per_bar, total_bars)
-    menu_controls = MenuControls(loop_station)
-
-    try:
-        print("Listening for rotary encoder changes and button presses...")
-        while True:
-            menu_controls.handle_rotary_encoder()
-            menu_controls.handle_encoder_button()
-            time.sleep(0.001)  # Small delay to prevent CPU overuse
-    except KeyboardInterrupt:
-        GPIO.cleanup()  # Clean up GPIO on program exit
+try:
+    print(f"Listening for rotary encoder changes and button presses...")
+    draw_menu(current_option)  # Draw the initial menu
+    while True:
+        handle_rotary_encoder()
+        handle_encoder_button()
+        time.sleep(0.001)  # Small delay to prevent CPU overuse
+except KeyboardInterrupt:
+    GPIO.cleanup()  # Clean up GPIO on program exit
