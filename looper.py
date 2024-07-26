@@ -272,10 +272,13 @@ def matrix_button_pressed(row_pin):
                 print(f"Matrix Keypad:: Key pressed: {key}")
                 with lock:
                     if current_screen == "menu":
-                        if key == 1:
-                            if menu_options[current_menu_option] == "GRABAR":
+                        if menu_options[current_menu_option] == "GRABAR":
+                            if key == 1:
                                 track_initializer.init_master_track()
-                            elif menu_options[current_menu_option] == "CONFIG":
+                            else:
+                                track_initializer.init_track(key)
+                        elif menu_options[current_menu_option] == "CONFIG":
+                            if key == 1:
                                 current_screen = "config"
                     elif current_screen == "config":
                         if key == 1:
