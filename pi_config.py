@@ -6,183 +6,174 @@ from PIL import Image, ImageDraw, ImageFont
 from luma.core.interface.serial import i2c, spi
 from luma.oled.device import sh1106
 
-# Initialize I2C interface and OLED display
-serial = i2c(port=1, address=0x3C)
-device = sh1106(serial)
+class RotaryEncoder:
+    def __init__(self, clk_pin, dt_pin, sw_pin, callback=None):
+        self.CLK_PIN = clk_pin
+        self.DT_PIN = dt_pin
+        self.SW_PIN = sw_pin
+        self.callback = callback
 
-# Path to your TTF font file
-font_path = 'fonts/InputSansNarrow-Thin.ttf'
+        self.DIRECTION_CW = 0
+        self.DIRECTION_CCW = 1
 
-# CONFIG options
-config_options = ["BPM", "TIME SIGNATURE", "TOTAL BARS"]
-config_option_values = {
-    "BPM": 120,
-    "TIME SIGNATURE": "4/4",
-    "TOTAL BARS": 4
-}
-time_signature_options = ["2/4", "3/4", "4/4"]
-current_config_option = 0
+        self.counter = 0
+        self.direction = self.DIRECTION_CW
+        self.prev_CLK_state = GPIO.HIGH
 
-# Define the GPIO pins for the rotary encoder
-CLK_PIN = 17  # GPIO7 connected to the rotary encoder's CLK pin
-DT_PIN = 27   # GPIO8 connected to the rotary encoder's DT pin
-SW_PIN = 22   # GPIO25 connected to the rotary encoder's SW pin
+        self.button_pressed = False
+        self.prev_button_state = GPIO.HIGH
 
-DIRECTION_CW = 0
-DIRECTION_CCW = 1
+        # Setup GPIO
+        GPIO.setwarnings(False)
+        GPIO.cleanup()
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(self.CLK_PIN, GPIO.IN)
+        GPIO.setup(self.DT_PIN, GPIO.IN)
+        GPIO.setup(self.SW_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-counter = 0
-direction = DIRECTION_CW
-prev_CLK_state = GPIO.HIGH
+        # Read the initial state of the rotary encoder's CLK pin
+        self.prev_CLK_state = GPIO.input(self.CLK_PIN)
 
-button_pressed = False
-prev_button_state = GPIO.HIGH
+    def handle_rotary_encoder(self):
+        while True:
+            CLK_state = GPIO.input(self.CLK_PIN)
+            DT_state = GPIO.input(self.DT_PIN)
 
-# Lock for synchronizing access to shared resources
-lock = threading.Lock()
+            if CLK_state != self.prev_CLK_state:
+                if DT_state != CLK_state:
+                    self.direction = self.DIRECTION_CW
+                else:
+                    self.direction = self.DIRECTION_CCW
 
-# Disable GPIO warnings
-GPIO.setwarnings(False)
+                self.counter += 1
+                if self.counter % 2 == 0:
+                    if self.callback:
+                        self.callback(self.direction)
 
-# Reset the GPIO pins
-GPIO.cleanup()
+            self.prev_CLK_state = CLK_state
+            time.sleep(0.001)
 
-# Set up the GPIO mode
-GPIO.setmode(GPIO.BCM)
+    def handle_encoder_button(self):
+        while True:
+            button_state = GPIO.input(self.SW_PIN)
+            if button_state != self.prev_button_state:
+                time.sleep(0.01)  # Debounce
+                if button_state == GPIO.LOW:
+                    self.button_pressed = True
+                    if self.callback:
+                        self.callback("button")
+                else:
+                    self.button_pressed = False
 
-# Set up GPIO pins for rotary encoder
-GPIO.setup(CLK_PIN, GPIO.IN)
-GPIO.setup(DT_PIN, GPIO.IN)
-GPIO.setup(SW_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+            self.prev_button_state = button_state
+            time.sleep(0.001)
 
-# Read the initial state of the rotary encoder's CLK pin
-prev_CLK_state = GPIO.input(CLK_PIN)
+class MenuScreen:
+    def __init__(self):
+        # Initialize I2C interface and OLED display
+        self.serial = i2c(port=1, address=0x3C)
+        self.device = sh1106(self.serial)
 
-def draw_config_screen():
-    global current_config_option
-    with lock:
-        # Create an image in portrait mode dimensions
-        image = Image.new('1', (64, 128), "black")
-        draw = ImageDraw.Draw(image)
-        
-        # Load a custom font
-        font_size = 12  # Adjust the font size as needed
-        font = ImageFont.truetype(font_path, font_size)
+        # Path to your TTF font file
+        self.font_path = 'fonts/InputSansNarrow-Thin.ttf'
 
-        # Draw config option
-        option = config_options[current_config_option]
-        if option == "BPM":
-            value = f"{config_option_values[option]} BPM"
-        elif option == "TIME SIGNATURE":
-            value = config_option_values[option]
-        elif option == "TOTAL BARS":
-            value = f"{config_option_values[option]} BARS"
+        # CONFIG options
+        self.config_options = ["BPM", "TIME SIGNATURE", "TOTAL BARS"]
+        self.config_option_values = {
+            "BPM": 120,
+            "TIME SIGNATURE": "4/4",
+            "TOTAL BARS": 4
+        }
+        self.time_signature_options = ["2/4", "3/4", "4/4"]
+        self.current_config_option = 0
+        self.lock = threading.Lock()
 
-        # Calculate text position
-        bbox = draw.textbbox((0, 0), value, font=font)  # Get bounding box
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        text_x = (64 - text_width) // 2
-        text_y = (128 - text_height) // 2  # Slightly below center, moved 5 pixels up
+    def update_value(self, direction):
+        with self.lock:
+            option = self.config_options[self.current_config_option]
+            if option == "BPM":
+                if direction == RotaryEncoder.DIRECTION_CW:
+                    self.config_option_values[option] += 1
+                    if self.config_option_values[option] > 200:
+                        self.config_option_values[option] = 200
+                else:
+                    self.config_option_values[option] -= 1
+                    if self.config_option_values[option] < 40:
+                        self.config_option_values[option] = 40
+            elif option == "TIME SIGNATURE":
+                index = self.time_signature_options.index(self.config_option_values[option])
+                if direction == RotaryEncoder.DIRECTION_CW:
+                    index = (index + 1) % len(self.time_signature_options)
+                else:
+                    index = (index - 1) % len(self.time_signature_options)
+                self.config_option_values[option] = self.time_signature_options[index]
+            elif option == "TOTAL BARS":
+                if direction == RotaryEncoder.DIRECTION_CW:
+                    self.config_option_values[option] += 1
+                    if self.config_option_values[option] > 16:
+                        self.config_option_values[option] = 16
+                else:
+                    self.config_option_values[option] -= 1
+                    if self.config_option_values[option] < 1:
+                        self.config_option_values[option] = 1
 
-        # Draw text on the screen
-        draw.text((text_x, text_y), value, font=font, fill="white")
-        
-        # Rotate the image by 90 degrees to fit the landscape display
-        rotated_image = image.rotate(270, expand=True)
-        
-        # Display the rotated image on the device
-        device.display(rotated_image)
+            print(f"{option}: {self.config_option_values[option]}")
 
-def handle_rotary_encoder():
-    global counter, direction, prev_CLK_state, current_config_option
-    while True:
-        # Read the current state of the rotary encoder's CLK and DT pins
-        CLK_state = GPIO.input(CLK_PIN)
-        DT_state = GPIO.input(DT_PIN)
+    def next_option(self):
+        with self.lock:
+            self.current_config_option = (self.current_config_option + 1) % len(self.config_options)
+            print(f"Switched to: {self.config_options[self.current_config_option]}")
 
-        # If the state of CLK is changed, then pulse occurred
-        if CLK_state != prev_CLK_state:
-            # Determine the direction
-            if DT_state != CLK_state:
-                direction = DIRECTION_CW
-            else:
-                direction = DIRECTION_CCW
+    def draw_config_screen(self):
+        while True:
+            with self.lock:
+                # Create an image in portrait mode dimensions
+                image = Image.new('1', (64, 128), "black")
+                draw = ImageDraw.Draw(image)
+                
+                # Load a custom font
+                font_size = 12  # Adjust the font size as needed
+                font = ImageFont.truetype(self.font_path, font_size)
 
-            counter += 1
-            if counter % 2 == 0:  # Only update on every second step
-                with lock:
-                    option = config_options[current_config_option]
-                    if option == "BPM":
-                        if direction == DIRECTION_CW:
-                            config_option_values[option] += 1
-                            if config_option_values[option] > 200:
-                                config_option_values[option] = 200
-                        else:
-                            config_option_values[option] -= 1
-                            if config_option_values[option] < 40:
-                                config_option_values[option] = 40
-                    elif option == "TIME SIGNATURE":
-                        index = time_signature_options.index(config_option_values[option])
-                        if direction == DIRECTION_CW:
-                            index = (index + 1) % len(time_signature_options)
-                        else:
-                            index = (index - 1) % len(time_signature_options)
-                        config_option_values[option] = time_signature_options[index]
-                    elif option == "TOTAL BARS":
-                        if direction == DIRECTION_CW:
-                            config_option_values[option] += 1
-                            if config_option_values[option] > 16:
-                                config_option_values[option] = 16
-                        else:
-                            config_option_values[option] -= 1
-                            if config_option_values[option] < 1:
-                                config_option_values[option] = 1
+                # Draw config option
+                option = self.config_options[self.current_config_option]
+                if option == "BPM":
+                    value = f"{self.config_option_values[option]} BPM"
+                elif option == "TIME SIGNATURE":
+                    value = self.config_option_values[option]
+                elif option == "TOTAL BARS":
+                    value = f"{self.config_option_values[option]} BARS"
 
-                    print(f"{option}: {config_option_values[option]}")
+                # Calculate text position
+                bbox = draw.textbbox((0, 0), value, font=font)  # Get bounding box
+                text_width = bbox[2] - bbox[0]
+                text_height = bbox[3] - bbox[1]
+                text_x = (64 - text_width) // 2
+                text_y = (128 - text_height) // 2  # Slightly below center, moved 5 pixels up
 
-        # Save last CLK state
-        prev_CLK_state = CLK_state
+                # Draw text on the screen
+                draw.text((text_x, text_y), value, font=font, fill="white")
+                
+                # Rotate the image by 90 degrees to fit the landscape display
+                rotated_image = image.rotate(270, expand=True)
+                
+                # Display the rotated image on the device
+                self.device.display(rotated_image)
+            
+            time.sleep(0.1)  # Update the screen every 0.1 seconds
 
-        time.sleep(0.001)  # Small delay to prevent CPU overuse
-
-def handle_encoder_button():
-    global button_pressed, prev_button_state, current_config_option
-    while True:
-        # State change detection for the button
-        button_state = GPIO.input(SW_PIN)
-        if button_state != prev_button_state:
-            time.sleep(0.01)  # Add a small delay to debounce
-            if button_state == GPIO.LOW:
-                print("Rotary Encoder Button:: The button is pressed")
-                button_pressed = True
-                with lock:
-                    # Move to the next configuration option
-                    current_config_option = (current_config_option + 1) % len(config_options)
-                    print(f"Switched to: {config_options[current_config_option]}")
-            else:
-                button_pressed = False
-
-        prev_button_state = button_state
-
-        time.sleep(0.001)  # Small delay to prevent CPU overuse
-
-def update_screen():
-    while True:
-        draw_config_screen()
-        time.sleep(0.1)  # Update the screen every 0.1 seconds
-
-try:
-    print(f"Listening for rotary encoder changes and button presses...")
+def main():
+    menu_screen = MenuScreen()
+    rotary_encoder = RotaryEncoder(clk_pin=CLK_PIN, dt_pin=DT_PIN, sw_pin=SW_PIN, callback=menu_screen.update_value)
     
     # Start threads for handling the rotary encoder, button press, and screen update
-    threading.Thread(target=handle_rotary_encoder, daemon=True).start()
-    threading.Thread(target=handle_encoder_button, daemon=True).start()
-    threading.Thread(target=update_screen, daemon=True).start()
+    threading.Thread(target=rotary_encoder.handle_rotary_encoder, daemon=True).start()
+    threading.Thread(target=rotary_encoder.handle_encoder_button, daemon=True).start()
+    threading.Thread(target=menu_screen.draw_config_screen, daemon=True).start()
 
     # Keep the main thread running
     while True:
         time.sleep(1)
 
-except KeyboardInterrupt:
-    GPIO.cleanup()  # Clean up GPIO on program exit
+if __name__ == "__main__":
+    main()
