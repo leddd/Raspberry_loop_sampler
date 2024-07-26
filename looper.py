@@ -128,7 +128,8 @@ class Track:
             beat_count = int(self.metronome.countdown_counter.get())
             image_index = beat_count - 1
             beat_image = beat_images_loaded[self.metronome.time_signature][image_index]
-            threading.Thread(target=draw_countdown_screen, args=(beat_count, beat_image)).start()
+            current_screen = "countdown"  # Switch to countdown screen
+            draw_countdown_screen(beat_count, beat_image)
     
     def print_beat(self):
         print("Current beat:", self.metronome.current_beat.get())
@@ -520,7 +521,10 @@ def update_screen():
             draw_menu()
         elif current_screen == "config":
             draw_config_screen()
-        time.sleep(0.05)  # Update the screen every 0.05 seconds
+        elif current_screen == "countdown":
+            # Countdown screen is updated by the Track class directly
+            pass
+        time.sleep(0.01)  # Update the screen every 0.01 seconds
 
 try:
     print(f"Listening for rotary encoder changes and button presses...")
