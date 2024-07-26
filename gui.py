@@ -57,40 +57,40 @@ def handle_rotary_encoder():
     if CLK_state != prev_CLK_state:
         # Determine the direction
         if DT_state != CLK_state:
-            counter += 1
             direction = DIRECTION_CW
         else:
-            counter -= 1
             direction = DIRECTION_CCW
 
-        option = config_options[current_config_option]
-        if option == "BPM":
-            if direction == DIRECTION_CW:
-                config_option_values[option] += 1
-                if config_option_values[option] > 200:
-                    config_option_values[option] = 200
-            else:
-                config_option_values[option] -= 1
-                if config_option_values[option] < 40:
-                    config_option_values[option] = 40
-        elif option == "TIME SIGNATURE":
-            index = time_signature_options.index(config_option_values[option])
-            if direction == DIRECTION_CW:
-                index = (index + 1) % len(time_signature_options)
-            else:
-                index = (index - 1) % len(time_signature_options)
-            config_option_values[option] = time_signature_options[index]
-        elif option == "TOTAL BARS":
-            if direction == DIRECTION_CW:
-                config_option_values[option] += 1
-                if config_option_values[option] > 16:
-                    config_option_values[option] = 16
-            else:
-                config_option_values[option] -= 1
-                if config_option_values[option] < 1:
-                    config_option_values[option] = 1
+        counter += 1
+        if counter % 2 == 0:  # Only update on every second step
+            option = config_options[current_config_option]
+            if option == "BPM":
+                if direction == DIRECTION_CW:
+                    config_option_values[option] += 1
+                    if config_option_values[option] > 200:
+                        config_option_values[option] = 200
+                else:
+                    config_option_values[option] -= 1
+                    if config_option_values[option] < 40:
+                        config_option_values[option] = 40
+            elif option == "TIME SIGNATURE":
+                index = time_signature_options.index(config_option_values[option])
+                if direction == DIRECTION_CW:
+                    index = (index + 1) % len(time_signature_options)
+                else:
+                    index = (index - 1) % len(time_signature_options)
+                config_option_values[option] = time_signature_options[index]
+            elif option == "TOTAL BARS":
+                if direction == DIRECTION_CW:
+                    config_option_values[option] += 1
+                    if config_option_values[option] > 16:
+                        config_option_values[option] = 16
+                else:
+                    config_option_values[option] -= 1
+                    if config_option_values[option] < 1:
+                        config_option_values[option] = 1
 
-        print(f"{option}: {config_option_values[option]}")
+            print(f"{option}: {config_option_values[option]}")
 
     # Save last CLK state
     prev_CLK_state = CLK_state
