@@ -130,7 +130,7 @@ class Track:
             self.table = NewTable(length=self.metronome.duration, chnls=self.channels, feedback=self.feedback)
             self.input = Input([0, 1])
             self.recorder = TableRec(self.input, table=self.table, fadetime=0.005)
-            self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=20, xfade=0)
+            self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=25, xfade=0)
             self.highpass = ButHP(self.playback, freq=self.hp_freq)  # Apply highpass filter
             self.lowpass = ButLP(self.highpass, freq=self.lp_freq)
             self.ex = Expand(self.lowpass, downthresh=-90, upthresh=-90, ratio=2, mul=0.1)
@@ -153,7 +153,7 @@ class Track:
             self.table = NewTable(length=self.metronome.duration, chnls=self.channels, feedback=self.feedback)
             self.input = Input([0, 1])
             self.recorder = TableRec(self.input, table=self.table, fadetime=0.01).out()
-            self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=20, xfade=0)
+            self.playback = Looper(table=self.table, dur=self.metronome.duration, mul=25, xfade=0)
             self.highpass = ButHP(self.playback, freq=self.hp_freq)  # Apply highpass filter
             self.lowpass = ButLP(self.highpass, freq=self.lp_freq)
             self.ex = Expand(self.lowpass, downthresh=-90, upthresh=-90, ratio=2, mul=0.1)
@@ -218,33 +218,33 @@ time_signature_options = ["2/4", "3/4", "4/4"]
 current_config_option = 0
 
 # Screen display functions
-def draw_countdown_screen(beat_count, beat_image):
-    with lock:
-        # Create a new image for the countdown screen
-        image = Image.new('1', (64, 128), "black")
-        draw = ImageDraw.Draw(image)
+# def draw_countdown_screen(beat_count, beat_image):
+#     with lock:
+#         # Create a new image for the countdown screen
+#         image = Image.new('1', (64, 128), "black")
+#         draw = ImageDraw.Draw(image)
 
-        # Load the beat image
-        image.paste(beat_image, (0, 0))
+#         # Load the beat image
+#         image.paste(beat_image, (0, 0))
 
-        # Load a custom font
-        font_size = 30  # Adjust the font size as needed
-        font = ImageFont.truetype(font_path, font_size)
+#         # Load a custom font
+#         font_size = 30  # Adjust the font size as needed
+#         font = ImageFont.truetype(font_path, font_size)
 
-        # Draw the countdown number
-        text = str(beat_count)
-        bbox = draw.textbbox((0, 0), text, font=font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        text_x = (64 - text_width) // 2
-        text_y = (128 - text_height) // 2
-        draw.text((text_x, text_y), text, font=font, fill="white")  # White text
+#         # Draw the countdown number
+#         text = str(beat_count)
+#         bbox = draw.textbbox((0, 0), text, font=font)
+#         text_width = bbox[2] - bbox[0]
+#         text_height = bbox[3] - bbox[1]
+#         text_x = (64 - text_width) // 2
+#         text_y = (128 - text_height) // 2
+#         draw.text((text_x, text_y), text, font=font, fill="white")  # White text
 
-        # Rotate the image by 90 degrees to fit the landscape display
-        rotated_image = image.rotate(270, expand=True)
+#         # Rotate the image by 90 degrees to fit the landscape display
+#         rotated_image = image.rotate(270, expand=True)
 
-        # Display the rotated image on the device
-        device.display(rotated_image)
+#         # Display the rotated image on the device
+#         device.display(rotated_image)
 
 def draw_menu():
     global current_menu_option
@@ -497,15 +497,15 @@ def matrix_button_pressed(row_pin):
         GPIO.output(col, GPIO.HIGH)
 
 # Countdown screen thread
-def countdown_screen_thread():
-    while True:
-        if current_screen == "countdown":
-            beat_count = int(loop_station.metronome.countdown_counter.get())
-            if beat_count <= loop_station.metronome.beats_per_bar:
-                image_index = beat_count - 1
-                beat_image = beat_images_loaded[loop_station.metronome.time_signature][image_index]
-                draw_countdown_screen(beat_count, beat_image)
-        time.sleep(0.1)
+# def countdown_screen_thread():
+#     while True:
+#         if current_screen == "countdown":
+#             beat_count = int(loop_station.metronome.countdown_counter.get())
+#             if beat_count <= loop_station.metronome.beats_per_bar:
+#                 image_index = beat_count - 1
+#                 beat_image = beat_images_loaded[loop_station.metronome.time_signature][image_index]
+#                 draw_countdown_screen(beat_count, beat_image)
+#         time.sleep(0.1)
 
 # Update screen thread
 def update_screen():
@@ -541,7 +541,7 @@ try:
     # Start threads for handling the rotary encoder, button press, screen update, and keeping the display active
     threading.Thread(target=handle_rotary_encoder, daemon=True).start()
     threading.Thread(target=update_screen, daemon=True).start()
-    threading.Thread(target=countdown_screen_thread, daemon=True).start()
+    # threading.Thread(target=countdown_screen_thread, daemon=True).start()
     threading.Thread(target=keep_display_active, daemon=True).start()
 
     # Keep the main thread running
