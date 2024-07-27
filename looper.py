@@ -20,7 +20,7 @@ config_option_values = {
     "TIME SIGNATURE": "4/4",
     "TOTAL BARS": 2
 }
-latency = 0  # Latency in seconds
+latency = 0.13  # Latency in seconds
 
 # Dictionary to store image paths for each time signature
 beat_images = {
