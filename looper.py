@@ -134,7 +134,7 @@ class Track:
             self.highpass = ButHP(self.playback, freq=self.hp_freq)  # Apply highpass filter
             self.lowpass = ButLP(self.highpass, freq=self.lp_freq)
             self.ex = Expand(self.lowpass, downthresh=-90, upthresh=-90, ratio=1.5, mul=0.1)
-            self.harm = Harmonizer(self.ex, transpo=0, winsize=0.05).out()
+            #self.harm = Harmonizer(self.ex, transpo=0, winsize=0.05).out()
             self.master_trig = CallAfter(self.start_recording, latency)
 
         if self.metronome.countdown_counter.get() == self.metronome.beats_per_bar * (1 + self.metronome.total_bars) + 1:
@@ -157,7 +157,7 @@ class Track:
             self.highpass = ButHP(self.playback, freq=self.hp_freq)  # Apply highpass filter
             self.lowpass = ButLP(self.highpass, freq=self.lp_freq)
             self.ex = Expand(self.lowpass, downthresh=-90, upthresh=-90, ratio=1.5, mul=0.1)
-            self.harm = Harmonizer(self.ex, transpo=0, winsize=0.05).out()
+            #self.harm = Harmonizer(self.ex, transpo=0, winsize=0.05).out()
             self.track_trig = CallAfter(self.start_recording, latency)
             self.initialized = True
         
