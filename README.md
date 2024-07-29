@@ -1,2 +1,1 @@
-# Raspberry_loop_sampler
- 
+# 6 track looper
